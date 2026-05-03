@@ -3,9 +3,14 @@ from flask import Flask , request
 import requests
 import base64
 import re
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 app=Flask(__name__)
-VT_API_KEY ="f414d9aa2948f0df0e4651352db7b5054498431c073b126e06edbd9928873846"
+VT_API_KEY = os.getenv("VT_API_KEY")
 #virsu total API key
 
 def scan_url_with_virustotal(url_to_scan):
