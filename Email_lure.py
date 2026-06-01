@@ -7,6 +7,8 @@ import base64
 import os
 from dotenv import load_dotenv
 
+from sandbox import run_sandbox
+
 # Load environment variables from .env file
 load_dotenv()
 
@@ -43,7 +45,8 @@ def scan_url_with_virustotal(url_to_scan):
                 print(" ACTION: Unknown/New Threat. Pushing to MobSF Sandbox for Deep Dive Analysis.")
         else:
             print(" URL not yet in VirusTotal database. Pushing to Sandbox...")
-            
+            run_sandbox(url_to_scan)
+
     except Exception as e:
         print(f"Error connecting to VirusTotal: {e}")
 

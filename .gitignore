@@ -1,2 +1,5 @@
 # Environment variables
 .env
+__pycache__
+capture.pcap
+sample.apk
