@@ -10,11 +10,14 @@ Configure in .env:
 from __future__ import annotations
 
 import os
+from dotenv import load_dotenv
 import re
 from typing import Optional
 from urllib.parse import urlparse
 
 import requests
+
+load_dotenv()
 
 REPLY_API_KEY = os.getenv("REPLY_API_KEY") or os.getenv("OPENAI_API_KEY", "")
 REPLY_API_BASE_URL = (
