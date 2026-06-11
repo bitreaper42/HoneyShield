@@ -40,7 +40,8 @@ if [ ${#MISSING_TOOLS[@]} -ne 0 ]; then
 fi
 
 # Extract Domain and Scheme
-SCHEME=$(echo "$URL" | grep :// | sed -e 's/^\([^:]*\).*/\1/')
+# SCHEME=$(echo "$URL" | grep :// | sed -e 's/^\([^:]*\).*/\1/')
+SCHEME=$(echo "$URL" | grep :// | sed 's#://.*##')
 if [ -z "$SCHEME" ]; then
     # Default to http if no scheme
     SCHEME="http"
@@ -49,7 +50,8 @@ else
     URL_WITH_SCHEME="$URL"
 fi
 
-DOMAIN=$(echo "$URL_WITH_SCHEME" | awk -F/ '{print $3}' | cut -d: -f1)
+# DOMAIN=$(echo "$URL_WITH_SCHEME" | awk -F/ '{print $3}' | cut -d: -f1)
+DOMAIN=$(echo "$URL_WITH_SCHEME" | cut -d/ -f3 | cut -d: -f1)
 
 if [ -z "$DOMAIN" ]; then
     echo -e "${RED}[!] Error: Could not extract domain from URL.${NC}"
@@ -93,15 +95,45 @@ else
     echo "$REDIRECT_TRACE" | grep -Ei "^(HTTP/|Location:)" | while read -r line; do
         if [[ "$line" =~ ^HTTP ]]; then
             STATUS=$(echo "$line" | awk '{print $2}')
-            echo -n -e "      [HTTP $STATUS] -> "
+            echo -n -e ".      [HTTP $STATUS] -> "
         elif [[ "$line" =~ ^[Ll]ocation: ]]; then
             LOC=$(echo "$line" | cut -d' ' -f2- | tr -d '\r')
             echo -e "${YELLOW}$LOC${NC}"
         fi
     done
     FINAL_URL=$(curl -Ls -o /dev/null -w "%{url_effective}" "$URL_WITH_SCHEME" -m 10 2>/dev/null)
+    if [ -z "$FINAL_URL" ]; then
+        FINAL_URL="$URL_WITH_SCHEME"
+    fi
     echo -e "      ${GREEN}${BOLD}[Final Landing URL]${NC} $FINAL_URL"
+    HEADERS_DATA=$(echo "$REDIRECT_TRACE" | grep -Ei "^(Server|Via|X-Cache|CF-Ray|X-CDN|X-Proxy|X-Amz-Cf-Id|CF-Cache-Status)" | tr '\r' '\n' | paste -sd ';' -)
 fi
+
+# Extract the final landing domain and scheme for subsequent analysis
+FINAL_SCHEME=$(echo "$FINAL_URL" | grep :// | sed 's#://.*##')
+if [ -z "$FINAL_SCHEME" ]; then
+    FINAL_SCHEME="http"
+fi
+FINAL_DOMAIN=$(echo "$FINAL_URL" | cut -d/ -f3 | cut -d: -f1)
+
+if [ -n "$FINAL_DOMAIN" ] && { [ "$DOMAIN" != "$FINAL_DOMAIN" ] || [ "$SCHEME" != "$FINAL_SCHEME" ]; }; then
+    if [ "$DOMAIN" != "$FINAL_DOMAIN" ]; then
+        echo -e "\n  ${YELLOW}[i] Target redirected to a new domain. Switching audit target:${NC}"
+        echo -e "      From: ${RED}$DOMAIN${NC}"
+        echo -e "      To:   ${GREEN}$FINAL_DOMAIN${NC}"
+    else
+        echo -e "\n  ${YELLOW}[i] Target redirected from $SCHEME to $FINAL_SCHEME. Updating audit target.${NC}"
+    fi
+    DOMAIN="$FINAL_DOMAIN"
+    SCHEME="$FINAL_SCHEME"
+    URL_WITH_SCHEME="$FINAL_URL"
+    URL="$FINAL_URL"
+fi
+
+# Extract CNAME of the final domain
+CNAME_DATA=$(dig +short CNAME "$DOMAIN" 2>/dev/null | paste -sd ';' -)
+
+
 
 
 # --- SECTION 2: WHOIS, REGISTRAR, AND DOMAIN AGE ---
@@ -215,9 +247,16 @@ fi
 if [ -n "$IP" ]; then
     echo -e "  ${GREEN}[+]$NC Resolved IP Address: ${BOLD}$IP${NC}"
     
+    EXPORT_ISP=""
+    EXPORT_ORG=""
+    EXPORT_ASN=""
+
     # Query ip-api.com for hosting/geo metadata
     IP_INFO=$(curl -s --max-time 5 "http://ip-api.com/json/$IP" 2>/dev/null)
     if [ -n "$IP_INFO" ] && echo "$IP_INFO" | grep -q '"status":"success"'; then
+        EXPORT_ISP=$(echo "$IP_INFO" | jq -r '.isp' 2>/dev/null || echo "$IP_INFO" | python3 -c "import sys, json; print(json.load(sys.stdin).get('isp',''))")
+        EXPORT_ORG=$(echo "$IP_INFO" | jq -r '.org' 2>/dev/null || echo "$IP_INFO" | python3 -c "import sys, json; print(json.load(sys.stdin).get('org',''))")
+        EXPORT_ASN=$(echo "$IP_INFO" | jq -r '.as' 2>/dev/null || echo "$IP_INFO" | python3 -c "import sys, json; print(json.load(sys.stdin).get('as',''))")
         python3 -c "
 import sys, json
 info = json.loads('''$IP_INFO''')
@@ -231,6 +270,9 @@ print(f'  \033[32m[+]\033[0m Country: {info.get(\"country\", \"N/A\")} ({info.ge
         echo -e "  ${YELLOW}[!] Online geo-IP lookup failed. Parsing WHOIS on IP...${NC}"
         IP_WHOIS=$(whois "$IP" 2>/dev/null)
         if [ -n "$IP_WHOIS" ]; then
+            EXPORT_ASN=$(echo "$IP_WHOIS" | grep -Ei "(origin|originas|asn|origin-as)" | head -n1 | awk '{print $2}')
+            EXPORT_ORG=$(echo "$IP_WHOIS" | grep -Ei "(orgname|descr|owner|organization|org-name)" | head -n1 | cut -d: -f2- | sed -e 's/^[ \t]*//')
+            EXPORT_ISP="$EXPORT_ORG"
             python3 -c "
 import sys, re
 whois_ip = \"\"\"$IP_WHOIS\"\"\"
@@ -243,6 +285,117 @@ print(f'  \033[32m[+]\033[0m Org (WHOIS): {org.group(1).strip() if org else \"N/
             echo -e "  ${RED}[!] IP WHOIS lookup failed.${NC}"
         fi
     fi
+
+    # Run combined Infrastructure Audit (CDNs, proxies, cloud/VPS detection)
+    export EXPORT_ISP EXPORT_ORG EXPORT_ASN HEADERS_DATA CNAME_DATA
+    python3 -c "
+import os, re
+isp = os.environ.get('EXPORT_ISP', '').lower()
+org = os.environ.get('EXPORT_ORG', '').lower()
+asn = os.environ.get('EXPORT_ASN', '').lower()
+headers = os.environ.get('HEADERS_DATA', '').lower()
+cnames = os.environ.get('CNAME_DATA', '').lower()
+
+cdns = {
+    'cloudflare': 'Cloudflare',
+    'akamai': 'Akamai',
+    'fastly': 'Fastly',
+    'sucuri': 'Sucuri',
+    'imperva': 'Imperva',
+    'incapsula': 'Incapsula / Imperva',
+    'keycdn': 'KeyCDN',
+    'bunny': 'Bunny CDN',
+    'gcore': 'Gcore',
+    'limelight': 'Limelight Networks',
+    'edgecast': 'Edgecast',
+    'stackpath': 'Stackpath'
+}
+
+cloud_vps = {
+    'amazon': 'Amazon Web Services (AWS)',
+    'aws': 'Amazon Web Services (AWS)',
+    'cloudfront': 'Amazon Web Services (AWS)',
+    'azure': 'Microsoft Azure',
+    'microsoft': 'Microsoft Azure',
+    'google': 'Google Cloud Platform (GCP)',
+    'digitalocean': 'DigitalOcean',
+    'linode': 'Linode / Akamai',
+    'hetzner': 'Hetzner',
+    'ovh': 'OVHcloud',
+    'vultr': 'Vultr',
+    'heroku': 'Heroku',
+    'oracle': 'Oracle Cloud',
+    'hostinger': 'Hostinger',
+    'alibaba': 'Alibaba Cloud',
+    'leaseweb': 'Leaseweb',
+    'm247': 'M247 VPS',
+    'choopa': 'Choopa'
+}
+
+proxies = {
+    'nginx': 'Nginx',
+    'apache': 'Apache',
+    'haproxy': 'HAProxy',
+    'traefik': 'Traefik',
+    'envoy': 'Envoy',
+    'caddy': 'Caddy'
+}
+
+detected_cdns = []
+detected_cloud = []
+detected_proxies = []
+
+# 1. Check CNAMEs
+for k, v in cdns.items():
+    if k in cnames and v not in detected_cdns:
+        detected_cdns.append(v)
+for k, v in cloud_vps.items():
+    if k in cnames and v not in detected_cloud:
+        detected_cloud.append(v)
+
+# 2. Check Headers
+for k, v in cdns.items():
+    if f'server: {k}' in headers or 'cf-ray' in headers or 'x-amz-cf-id' in headers:
+        if v not in detected_cdns:
+            if k == 'cloudflare' and 'cf-ray' in headers:
+                detected_cdns.append(v)
+            elif k == 'aws' and 'x-amz-cf-id' in headers:
+                detected_cdns.append('Amazon Cloudfront (AWS)')
+            elif f'server: {k}' in headers:
+                detected_cdns.append(v)
+                
+for k, v in proxies.items():
+    if f'server: {k}' in headers:
+        if v not in detected_proxies:
+            detected_proxies.append(v)
+
+# 3. Check ISP/Org/ASN
+for k, v in cdns.items():
+    if (k in isp or k in org or k in asn) and v not in detected_cdns:
+        detected_cdns.append(v)
+for k, v in cloud_vps.items():
+    if (k in isp or k in org or k in asn) and v not in detected_cloud:
+        detected_cloud.append(v)
+
+# Display results
+print('\n  \033[1;36m[*] Infrastructure Audit:\033[0m')
+if detected_cdns:
+    print(f'      - \033[32m[CDN Detected]\033[0m { \", \".join(detected_cdns) }')
+if detected_proxies:
+    print(f'      - \033[32m[Reverse Proxy/LB Detected]\033[0m { \", \".join(detected_proxies) }')
+if detected_cloud:
+    print(f'      - \033[32m[Cloud/VPS Provider]\033[0m { \", \".join(detected_cloud) }')
+
+# Risk decision
+if detected_cloud and not detected_cdns:
+    print(f'      \033[1;33m[!] WARNING: Exposed Cloud/VPS Host Detected. Target files are hosted directly on raw cloud infrastructure ({ \", \".join(detected_cloud) }) without a CDN proxy. This is common for ad-hoc malware C2s and phishing hosts.\033[0m')
+elif detected_cloud and detected_cdns:
+    print(f'      \033[32m[✔] Cloud infrastructure ({ \", \".join(detected_cloud) }) is protected behind a CDN layer ({ \", \".join(detected_cdns) }).\033[0m')
+elif detected_cdns:
+    print(f'      \033[32m[✔] Target uses CDN fronting ({ \", \".join(detected_cdns) }), hiding origin IP.\033[0m')
+else:
+    print('      \033[32m[✔] No direct raw cloud hosting detected (Standard Hosting/Dedicated Server).\033[0m')
+"
 else
     echo -e "  ${RED}[!] DNS Resolution failed. Domain could be offline or malicious DGA.${NC}"
 fi

@@ -1,0 +1,14 @@
+{
+  "brands": {
+    "sbi": ["sbi", "statebank"],
+    "yono": ["sbi", "yono"],
+    "paypal": ["paypal"],
+    "chase": ["chase"],
+    "hdfc": ["hdfc"],
+    "icici": ["icici"],
+    "binance": ["binance"],
+    "coinbase": ["coinbase"],
+    "stripe": ["stripe"],
+    "hsbc": ["hsbc"]
+  }
+}

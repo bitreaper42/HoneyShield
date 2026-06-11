@@ -11,13 +11,13 @@ sleep 3
 
 APK_URL="$1"
 
-echo "[*] Downloading APK..."
-sleep 3
-wget -q -O sample.apk "$APK_URL" || { echo "[!] Download failed"; exit 1; }
-
-echo ""
-echo "[*] APK saved as sample.apk"
-sleep 3
+echo "[*] Verifying pre-downloaded APK..."
+if [ ! -f "sample.apk" ]; then
+    echo "[!] Error: sample.apk not found. Please ensure the defensive download stage has completed."
+    exit 1
+fi
+echo "[✔] Found sample.apk. Proceeding with network sandbox analysis."
+sleep 2
 
 echo ""
 echo "===== MANUAL STEPS (DO THIS ON PHONE) ====="
