@@ -306,7 +306,7 @@ def run_real_sandbox(target, api_key):
             print(f"  - {sig}")
             
     # Output to standard JSON results file
-    output_path = "apk_dynamic_results.json"
+    output_path = "data/outputs/apk_dynamic_results.json"
     with open(output_path, "w") as f:
         json.dump(results, f, indent=4)
     print(f"\n[+] Dynamic analysis JSON results saved to: {output_path}\n")

@@ -7,8 +7,8 @@ import base64
 import os
 from dotenv import load_dotenv
 
-from sandbox import analyze_url
-from pdfparser import extract_payload_from_pdf
+from src.analysis.sandbox import analyze_url
+from src.analysis.pdfparser import extract_payload_from_pdf
 
 # Load environment variables from .env file
 load_dotenv()

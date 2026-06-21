@@ -199,7 +199,7 @@ def hunt_domains(apk_path):
         "all_extracted_urls": sorted(list(found_urls))
     }
     
-    output_path = "hunted_domains.json"
+    output_path = "data/outputs/hunted_domains.json"
     with open(output_path, "w") as f:
         json.dump(output_data, f, indent=4)
         

@@ -13,7 +13,7 @@ MAX_FILE_SIZE = 100 * 1024 * 1024  # 100 MB limit
 TIMEOUT = 15  # seconds
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
-def download_and_hash_apk(url, output_path="sample.apk", hash_output_path="apk_hash.txt"):
+def download_and_hash_apk(url, output_path="data/inputs/sample.apk", hash_output_path="data/inputs/sample_apk_hash.txt"):
     print(f"[*] Starting defensive APK download from: {url}")
     
     # Configure request with a custom user-agent
@@ -78,7 +78,7 @@ if __name__ == "__main__":
         sys.exit(1)
         
     target_url = sys.argv[1]
-    out_file = sys.argv[2] if len(sys.argv) > 2 else "sample.apk"
-    hash_out = sys.argv[3] if len(sys.argv) > 3 else "apk_hash.txt"
+    out_file = sys.argv[2] if len(sys.argv) > 2 else "data/inputs/sample.apk"
+    hash_out = sys.argv[3] if len(sys.argv) > 3 else "data/inputs/sample_apk_hash.txt"
     
     download_and_hash_apk(target_url, out_file, hash_out)

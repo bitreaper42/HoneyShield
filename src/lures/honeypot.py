@@ -7,9 +7,9 @@ import io
 from pypdf import PdfReader
 from dotenv import load_dotenv
 
-from reply_engine import classify_branch, engine_status, get_lure_reply
-from sandbox import analyze_url
-from pdfparser import extract_payload_from_pdf, extract_payload_from_generic_media
+from src.lures.reply_engine import classify_branch, engine_status, get_lure_reply
+from src.analysis.sandbox import analyze_url
+from src.analysis.pdfparser import extract_payload_from_pdf, extract_payload_from_generic_media
 
 # Load environment variables from .env file
 load_dotenv()
