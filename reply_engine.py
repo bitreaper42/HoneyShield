@@ -194,3 +194,7 @@ def engine_status() -> str:
     llm = "on" if _llm_enabled() else "off"
     host = urlparse(REPLY_API_BASE_URL).netloc or REPLY_API_BASE_URL
     return f"llm_api endpoint={host} model={REPLY_API_MODEL} llm={llm}"
+
+def init_engine():
+    print(f"[REPLY] Initializing Reply Engine...")
+    print(f"[REPLY] {engine_status()}")

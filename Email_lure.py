@@ -7,7 +7,8 @@ import base64
 import os
 from dotenv import load_dotenv
 
-from sandbox import run_sandbox
+from sandbox import analyze_url
+from pdfparser import extract_payload_from_pdf
 
 # Load environment variables from .env file
 load_dotenv()
@@ -16,42 +17,15 @@ load_dotenv()
 IMAP_SERVER = "imap.gmail.com"
 EMAIL_ACCOUNT = os.getenv("EMAIL_ACCOUNT")
 APP_PASSWORD = os.getenv("APP_PASSWORD")
-VT_API_KEY = os.getenv("VT_API_KEY")
 # ---------------------------
-def scan_url_with_virustotal(url_to_scan):
-
-    
-    # VirusTotal requires the URL to be converted to base64 format for the API
-    url_id = base64.urlsafe_b64encode(url_to_scan.encode()).decode().strip("=")
-    api_url = f"https://www.virustotal.com/api/v3/urls/{url_id}"
-    
-    headers = {
-        "accept": "application/json",
-        "x-apikey": VT_API_KEY
-    }
-    
-    try:
-        response = requests.get(api_url, headers=headers)
-        if response.status_code == 200:
-            stats = response.json()['data']['attributes']['last_analysis_stats']
-            malicious_votes = stats['malicious']
-            harmless_votes = stats['harmless']
-            
-            print(f" VIRUSTOTAL RESULTS: {malicious_votes} ")
-            
-            if malicious_votes > 0:
-                print(" ACTION: High Threat Detected! Preparing payload for isolated MobSF Sandbox detonation.")
-            else:
-                print(" ACTION: Unknown/New Threat. Pushing to MobSF Sandbox for Deep Dive Analysis.")
-        else:
-            print(" URL not yet in VirusTotal database. Pushing to Sandbox...")
-            run_sandbox(url_to_scan)
-
-    except Exception as e:
-        print(f"Error connecting to VirusTotal: {e}")
 
 
 def check_inbox():
+    if not EMAIL_ACCOUNT or not APP_PASSWORD:
+        print("[!] Missing EMAIL_ACCOUNT or APP_PASSWORD. Please check your .env file.")
+        time.sleep(60) # Wait longer so we don't spam the console
+        return
+
     try:
         #Connects to the Gmail Server securely
         mail = imaplib.IMAP4_SSL(IMAP_SERVER)
@@ -79,8 +53,14 @@ def check_inbox():
                     body = ""
                     if msg.is_multipart():
                         for part in msg.walk():
-                            if part.get_content_type() == "text/plain":
+                            content_type = part.get_content_type()
+                            if content_type == "text/plain":
                                 body = part.get_payload(decode=True).decode()
+                            elif "pdf" in content_type:
+                                file_bytes = part.get_payload(decode=True)
+                                filename = part.get_filename() or "attachment.pdf"
+                                print(f" [EMAIL] Found PDF attachment: {filename}")
+                                extract_payload_from_pdf(file_bytes, filename)
                     else:
                         body = msg.get_payload(decode=True).decode()
                     process_email_content(body)
@@ -99,17 +79,19 @@ def process_email_content(body):
     if urls:
         extracted_url = urls[0]
         print(f" THREAT DETECTED! Extracted URL: {extracted_url}")
-        print("Ready to forward to VirusTotal..")
-        scan_url_with_virustotal(extracted_url)
+        print("Ready to forward to Threat Analysis..")
+        analyze_url(extracted_url)
         # NOTE: You can easily paste your VirusTotal function from the other script right here!
     else:
         print(" No URLs found in this email.")
 
-if __name__ == "__main__":
+def start_email_monitor():
     print(" HoneyShield Email Lure is active.")
     print(" Monitoring inbox for incoming threats...")
-    
     
     while True:
         check_inbox()
         time.sleep(10)
+
+if __name__ == "__main__":
+    start_email_monitor()
