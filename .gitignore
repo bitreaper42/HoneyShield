@@ -4,4 +4,6 @@ __pycache__/
 *.pyc
 capture.pcap
 sample.apk
-.antigravitycli/
+HoneyShield_June_Sprint_Plan.csv
+apk_dynamic_results.json
+hunted_domains.json
