@@ -7,4 +7,5 @@ sample.apk
 HoneyShield_June_Sprint_Plan.csv
 apk_dynamic_results.json
 hunted_domains.json
-.agents/
+apk_scan_results.json
+data/outputs/c2_detection_report.json
