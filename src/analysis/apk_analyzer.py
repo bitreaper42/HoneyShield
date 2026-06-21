@@ -8,6 +8,11 @@ import hashlib
 import urllib.request
 from urllib.error import URLError, HTTPError
 
+# Ensure correct package import path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+from src.analysis.credential_store import get_or_create_credentials
+
+
 # Configurable limits
 MAX_FILE_SIZE = 100 * 1024 * 1024  # 100 MB limit
 TIMEOUT = 15  # seconds
@@ -53,6 +58,13 @@ def download_and_hash_apk(url, output_path="data/inputs/sample.apk", hash_output
         print(f"[✔] Safe download complete. File saved to: {output_path} ({bytes_downloaded / (1024*1024):.2f} MB)")
         print(f"[✔] Computed SHA-256: {file_hash}")
         
+        # Generate and cache unique credentials for this APK hash
+        try:
+            creds = get_or_create_credentials(file_hash)
+            print(f"[+] Unique Threat Credentials for APK: {creds}")
+        except Exception as e:
+            print(f"[!] Failed to generate unique threat credentials: {e}")
+            
         # Write hash to local output file
         with open(hash_output_path, "w") as hf:
             hf.write(file_hash + "\n")

@@ -9,7 +9,12 @@ import re
 import zipfile
 import json
 import requests
+import hashlib
 from urllib.parse import urlparse
+
+# Ensure correct package import path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+from src.analysis.credential_store import get_or_create_credentials
 
 # Colors for terminal output
 RED = '\033[0;31m'
@@ -62,7 +67,7 @@ def scan_bundle_for_url_and_params(apk_path, suspicious_domains):
     extracted_urls = sorted(list(set(extracted_urls)))
     return extracted_urls
 
-def probe_endpoint(base_url, path):
+def probe_endpoint(base_url, path, credentials=None):
     """Probes a candidate endpoint path with GET and POST requests to detect routes."""
     url = f"{base_url.rstrip('/')}/{path.lstrip('/')}"
     print(f"\n[*] Probing candidate route: {url}")
@@ -73,8 +78,8 @@ def probe_endpoint(base_url, path):
     # 1. Probe with POST (common for logins)
     try:
         headers = {"Content-Type": "application/json"}
-        # Send a standard credential payload schema
-        test_payload = {"username": "test_user", "password": "test_password"}
+        # Send dynamic credentials if available, otherwise use default mock credentials
+        test_payload = credentials if credentials else {"username": "test_user", "password": "test_password"}
         resp = requests.post(url, json=test_payload, headers=headers, timeout=8)
         
         print(f"    [POST] Status Code: {resp.status_code}")
@@ -133,6 +138,23 @@ def main():
     print(f"[*] Loaded suspicious domains from hunted report: {suspicious_domains}")
     
     try:
+        # Calculate SHA-256 hash of the target APK to fetch/generate unique credentials
+        credentials = None
+        try:
+            sha256 = hashlib.sha256()
+            with open(apk_path, 'rb') as f:
+                while True:
+                    chunk = f.read(8192)
+                    if not chunk:
+                        break
+                    sha256.update(chunk)
+            apk_hash = sha256.hexdigest()
+            print(f"[*] Target APK SHA-256: {apk_hash}")
+            credentials = get_or_create_credentials(apk_hash)
+            print(f"[*] Loaded threat credentials: {credentials}")
+        except Exception as e:
+            print(f"{YELLOW}[!] Failed to load credentials from Redis: {e}. Using defaults.{NC}")
+
         urls = scan_bundle_for_url_and_params(apk_path, suspicious_domains)
         
         if not urls:
@@ -165,7 +187,7 @@ def main():
         
         # Probe all candidate endpoints to detect method and active routes
         for path in candidates:
-            method, payload, params = probe_endpoint(base_url, path)
+            method, payload, params = probe_endpoint(base_url, path, credentials)
             if method:
                 endpoint_info = {
                     "endpoint": f"/{path}",
