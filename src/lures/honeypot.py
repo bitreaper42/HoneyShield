@@ -4,13 +4,15 @@ import base64
 import re
 import os
 import io
+import hashlib
 from pypdf import PdfReader
 from dotenv import load_dotenv
 
-from reply_engine import classify_branch, engine_status, get_lure_reply
-from sandbox import analyze_url
-from pdfparser import extract_payload_from_pdf, extract_payload_from_generic_media
-from db_manager import create_incident_record
+from src.lures.reply_engine import classify_branch, engine_status, get_lure_reply
+from src.analysis.sandbox import analyze_url
+from src.analysis.pdfparser import extract_payload_from_pdf, extract_payload_from_generic_media
+from src.analysis.credential_store import get_or_create_credentials
+from Database_manager.db_manager import create_incident_record
 
 # Load environment variables from .env file
 load_dotenv()
@@ -102,6 +104,15 @@ def incoming_message():
                 elif "android" in media_type or "octet-stream" in media_type:
                     filename = f"{base_name}.apk"
                     media_reply_branch = "media_apk"
+                    
+                    # Calculate SHA-256 hash and pre-generate unique threat credentials
+                    file_hash = hashlib.sha256(file_bytes).hexdigest()
+                    print(f"[MEDIA] Intercepted APK file. Calculated SHA-256: {file_hash}")
+                    try:
+                        creds = get_or_create_credentials(file_hash)
+                        print(f"[MEDIA] Auto-generated threat credentials for APK: {creds}")
+                    except Exception as e:
+                        print(f"[MEDIA] [!] Failed to auto-generate threat credentials: {e}")
                 else:
                     filename = f"{base_name}.bin"
                 

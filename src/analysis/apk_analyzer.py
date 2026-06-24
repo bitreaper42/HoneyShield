@@ -8,12 +8,17 @@ import hashlib
 import urllib.request
 from urllib.error import URLError, HTTPError
 
+# Ensure correct package import path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+from src.analysis.credential_store import get_or_create_credentials
+
+
 # Configurable limits
 MAX_FILE_SIZE = 100 * 1024 * 1024  # 100 MB limit
 TIMEOUT = 15  # seconds
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
-def download_and_hash_apk(url, output_path="sample.apk", hash_output_path="apk_hash.txt"):
+def download_and_hash_apk(url, output_path="data/inputs/sample.apk", hash_output_path="data/inputs/sample_apk_hash.txt"):
     print(f"[*] Starting defensive APK download from: {url}")
     
     # Configure request with a custom user-agent
@@ -53,6 +58,13 @@ def download_and_hash_apk(url, output_path="sample.apk", hash_output_path="apk_h
         print(f"[✔] Safe download complete. File saved to: {output_path} ({bytes_downloaded / (1024*1024):.2f} MB)")
         print(f"[✔] Computed SHA-256: {file_hash}")
         
+        # Generate and cache unique credentials for this APK hash
+        try:
+            creds = get_or_create_credentials(file_hash)
+            print(f"[+] Unique Threat Credentials for APK: {creds}")
+        except Exception as e:
+            print(f"[!] Failed to generate unique threat credentials: {e}")
+            
         # Write hash to local output file
         with open(hash_output_path, "w") as hf:
             hf.write(file_hash + "\n")
@@ -78,7 +90,7 @@ if __name__ == "__main__":
         sys.exit(1)
         
     target_url = sys.argv[1]
-    out_file = sys.argv[2] if len(sys.argv) > 2 else "sample.apk"
-    hash_out = sys.argv[3] if len(sys.argv) > 3 else "apk_hash.txt"
+    out_file = sys.argv[2] if len(sys.argv) > 2 else "data/inputs/sample.apk"
+    hash_out = sys.argv[3] if len(sys.argv) > 3 else "data/inputs/sample_apk_hash.txt"
     
     download_and_hash_apk(target_url, out_file, hash_out)

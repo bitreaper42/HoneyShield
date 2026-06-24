@@ -2,9 +2,9 @@ import threading
 import time
 
 # Import the main functions from the modules
-from reply_engine import init_engine
-from Email_lure import start_email_monitor
-from honeypot import start_flask_app
+from src.lures.reply_engine import init_engine
+from src.lures.Email_lure import start_email_monitor
+from src.lures.honeypot import start_flask_app
 
 def main():
     # 1. Initialize Reply Engine

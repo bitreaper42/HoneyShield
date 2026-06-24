@@ -14,19 +14,19 @@ def run_sandbox(apk_url, record_id=None):
     tokens = generate_and_assign_honeytokens(record_id)
 
     subprocess.run(
-        ["bash", "url_sanity_check.sh", apk_url],
+        ["bash", "scripts/url_sanity_check.sh", apk_url],
         check=True
     )
     
     # Safely download the APK and calculate its SHA-256 hash
     subprocess.run(
-        ["python3", "apk_analyzer.py", apk_url],
+        ["python3", "src/analysis/apk_analyzer.py", apk_url],
         check=True
     )
     
     # Perform the interactive network sandbox analysis
     subprocess.run(
-        ["bash", "interactive_analysis.sh", apk_url],
+        ["bash", "scripts/interactive_analysis.sh", apk_url],
         check=True
     )
     

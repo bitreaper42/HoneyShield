@@ -84,7 +84,7 @@ def extract_package_name(manifest_strings):
             return c
     return candidates[0]
 
-def load_brands(config_path="monitored_brands.json", custom_brands_str=None):
+def load_brands(config_path="config/monitored_brands.json", custom_brands_str=None):
     """Loads brand profiles (brand name mapped to allowed package substrings)."""
     # Default fallback profiles
     brands = {
@@ -125,7 +125,7 @@ def load_brands(config_path="monitored_brands.json", custom_brands_str=None):
             
     return brands
 
-def scan_apk(apk_path, config_path="monitored_brands.json", custom_brands=None):
+def scan_apk(apk_path, config_path="config/monitored_brands.json", custom_brands=None):
     if not os.path.exists(apk_path):
         print(f"{RED}[!] Error: File not found at {apk_path}{NC}")
         sys.exit(1)
@@ -367,7 +367,7 @@ def scan_apk(apk_path, config_path="monitored_brands.json", custom_brands=None):
         print(f"  Risk Level: {color}{BOLD}{results['risk_level']}{NC}")
         print(f"{CYAN}{BOLD}======================================================================{NC}")
         
-        output_json_path = "apk_scan_results.json"
+        output_json_path = "data/outputs/apk_scan_results.json"
         with open(output_json_path, "w") as jf:
             json.dump(results, jf, indent=4)
         print(f"[+] Static scan JSON results saved to: {output_json_path}\n")
@@ -382,7 +382,7 @@ def scan_apk(apk_path, config_path="monitored_brands.json", custom_brands=None):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="HoneyShield Static APK Threat Analyzer")
     parser.add_argument("apk_path", help="Path to the target APK file to analyze")
-    parser.add_argument("--brands-config", default="monitored_brands.json", help="Path to the JSON brands config file (default: monitored_brands.json)")
+    parser.add_argument("--brands-config", default="config/monitored_brands.json", help="Path to the JSON brands config file (default: config/monitored_brands.json)")
     parser.add_argument("--brands", help="Custom brand specifications override. Format: 'brand1:pkg1,pkg2;brand2:pkg3'")
     
     args = parser.parse_args()
