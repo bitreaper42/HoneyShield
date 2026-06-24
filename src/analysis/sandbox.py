@@ -3,8 +3,8 @@ import os
 import requests
 import base64
 from dotenv import load_dotenv
-from db_manager import update_incident_record
-from db_manager import generate_and_assign_honeytokens
+from Database_manager.db_manager import update_incident_record
+from Database_manager.db_manager import generate_and_assign_honeytokens
 
 load_dotenv()
 VT_API_KEY = os.getenv("VT_API_KEY")

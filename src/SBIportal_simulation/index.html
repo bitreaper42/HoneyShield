@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Retail Internet Banking | Secure Login</title>
+    <!-- Modern typography from Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        /* === Core Variables & Reset === */
+        :root {
+            --primary-blue: #1e3a8a;       /* Deep corporate blue */
+            --secondary-blue: #3b82f6;     /* Brighter interactive blue */
+            --background-gray: #f3f4f6;    /* Soft background */
+            --text-dark: #1f2937;
+            --text-muted: #6b7280;
+            --error-red: #ef4444;
+            --error-bg: #fef2f2;
+            --white: #ffffff;
+            --card-shadow: 0 10px 25px rgba(0, 0, 0, 0.05), 0 4px 6px rgba(0, 0, 0, 0.03);
+            --transition: all 0.3s ease;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background-color: var(--background-gray);
+            background-image: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            color: var(--text-dark);
+        }
+
+        /* === Header & Navigation === */
+        header {
+            background: var(--white);
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 3px solid var(--primary-blue);
+        }
+
+        .brand-logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--primary-blue);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .logo-circle {
+            width: 36px;
+            height: 36px;
+            background: var(--primary-blue);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--white);
+            font-size: 1.2rem;
+        }
+
+        .header-links a {
+            text-decoration: none;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            font-weight: 500;
+            margin-left: 1.5rem;
+            transition: var(--transition);
+        }
+
+        .header-links a:hover {
+            color: var(--primary-blue);
+        }
+
+        /* === Main Layout === */
+        main {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem;
+        }
+
+        .login-container {
+            display: flex;
+            background: var(--white);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: var(--card-shadow);
+            max-width: 900px;
+            width: 100%;
+        }
+
+        /* === Decorative Side Banner === */
+        .info-panel {
+            flex: 1;
+            background: linear-gradient(145deg, var(--primary-blue) 0%, #172554 100%);
+            color: var(--white);
+            padding: 3rem 2rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            position: relative;
+        }
+
+        .info-panel::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: url('data:image/svg+xml;utf8,<svg opacity="0.05" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="none" stroke="white" stroke-width="2"/></svg>') repeat;
+            pointer-events: none;
+        }
+
+        .info-panel h2 {
+            font-size: 1.8rem;
+            margin-bottom: 1rem;
+            font-weight: 600;
+        }
+
+        .info-panel p {
+            font-size: 0.95rem;
+            line-height: 1.6;
+            opacity: 0.9;
+            margin-bottom: 2rem;
+        }
+
+        .security-badge {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(255,255,255,0.1);
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            backdrop-filter: blur(5px);
+        }
+
+        /* === Login Form Panel === */
+        .form-panel {
+            flex: 1;
+            padding: 3rem;
+            background: var(--white);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .form-panel h3 {
+            font-size: 1.5rem;
+            color: var(--primary-blue);
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+
+        .form-panel > p {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            margin-bottom: 2rem;
+        }
+
+        /* Error Box */
+        #error-box {
+            display: none;
+            background-color: var(--error-bg);
+            color: var(--error-red);
+            border: 1px solid #fca5a5;
+            padding: 0.75rem 1rem;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            margin-bottom: 1.5rem;
+            align-items: center;
+            gap: 8px;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Input Groups */
+        .input-group {
+            margin-bottom: 1.5rem;
+            position: relative;
+        }
+
+        .input-group label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-dark);
+            margin-bottom: 0.5rem;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 0.8rem 1rem;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 0.95rem;
+            transition: var(--transition);
+            outline: none;
+            background: #f9fafb;
+        }
+
+        .input-group input:focus {
+            border-color: var(--secondary-blue);
+            background: var(--white);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        /* Button */
+        .submit-btn {
+            width: 100%;
+            padding: 0.85rem;
+            background: var(--primary-blue);
+            color: var(--white);
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .submit-btn:hover {
+            background: var(--secondary-blue);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+
+        .submit-btn:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        /* Loading Spinner */
+        .spinner {
+            display: none;
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: var(--white);
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .btn-text {
+            display: inline-block;
+        }
+
+        /* Form Footer */
+        .form-footer {
+            margin-top: 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.85rem;
+        }
+
+        .form-footer a {
+            color: var(--secondary-blue);
+            text-decoration: none;
+            font-weight: 500;
+            transition: var(--transition);
+        }
+
+        .form-footer a:hover {
+            text-decoration: underline;
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 1.5rem;
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            border-top: 1px solid #e5e7eb;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .login-container {
+                flex-direction: column;
+            }
+            .info-panel {
+                padding: 2rem;
+                text-align: center;
+            }
+            .security-badge {
+                justify-content: center;
+            }
+            .form-panel {
+                padding: 2rem;
+            }
+            .header-links {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header -->
+    <header>
+        <div class="brand-logo">
+            <div class="logo-circle">B</div>
+            Secure Retail Banking
+        </div>
+        <div class="header-links">
+            <a href="#">About Us</a>
+            <a href="#">Customer Care</a>
+            <a href="#">Security Tips</a>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main>
+        <div class="login-container">
+            
+            <!-- Information Panel (Left) -->
+            <div class="info-panel">
+                <h2>Welcome to Internet Banking</h2>
+                <p>Experience seamless, secure, and lightning-fast digital banking. Manage your accounts, transfer funds, and track your investments anytime, anywhere.</p>
+                <div class="security-badge">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                    256-bit TLS Encryption Enabled
+                </div>
+            </div>
+
+            <!-- Login Form (Right) -->
+            <div class="form-panel">
+                <h3>Personal Login</h3>
+                <p>Enter your credentials to access your account.</p>
+
+                <!-- Dynamic Error Box -->
+                <div id="error-box">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                    <span id="error-message"></span>
+                </div>
+
+                <form id="login-form">
+                    <div class="input-group">
+                        <label for="username">User ID / Mobile Number</label>
+                        <input type="text" id="username" name="username" placeholder="Enter User ID" required autocomplete="off">
+                    </div>
+                    
+                    <div class="input-group">
+                        <label for="password">Password</label>
+                        <input type="password" id="password" name="password" placeholder="Enter Password" required>
+                    </div>
+
+                    <button type="submit" class="submit-btn" id="submit-btn">
+                        <span class="btn-text" id="btn-text">Login Securely</span>
+                        <div class="spinner" id="spinner"></div>
+                    </button>
+
+                    <div class="form-footer">
+                        <a href="#">Forgot Password?</a>
+                        <span>New User? <a href="#">Register Here</a></span>
+                    </div>
+                </form>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer>
+        <p>&copy; 2026 Secure Retail Banking Corporation. All rights reserved.</p>
+        <p style="margin-top: 5px; opacity: 0.7;">Never share your password, PIN, or OTP with anyone.</p>
+    </footer>
+
+    <!-- Embedded JavaScript Logic -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const loginForm = document.getElementById('login-form');
+            const submitBtn = document.getElementById('submit-btn');
+            const btnText = document.getElementById('btn-text');
+            const spinner = document.getElementById('spinner');
+            const errorBox = document.getElementById('error-box');
+            const errorMessage = document.getElementById('error-message');
+
+            loginForm.addEventListener('submit', async (e) => {
+                // 1. Prevent standard form submission
+                e.preventDefault();
+
+                // 2. Hide previous errors
+                errorBox.style.display = 'none';
+                
+                // 3. Extract inputs
+                const usernameVal = document.getElementById('username').value.trim();
+                const passwordVal = document.getElementById('password').value.trim();
+
+                if (!usernameVal || !passwordVal) return;
+
+                // 4. Update UI to loading state
+                submitBtn.disabled = true;
+                btnText.style.display = 'none';
+                spinner.style.display = 'block';
+
+                try {
+                    // 5. Send Async POST Request to the Flask API
+                    const response = await fetch('http://127.0.0.1:8080/api/login', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            username: usernameVal,
+                            password: passwordVal
+                        })
+                    });
+
+                    // 6. Parse JSON Payload
+                    const data = await response.json();
+
+                    // 7. Handle response (Success/Fail doesn't matter, we display the error)
+                    if (!response.ok || data.error) {
+                        showError(data.error || "An unexpected error occurred.");
+                    } else {
+                        // In case of successful login (not expected in tarpit simulation, but just in case)
+                        showError("Login successful. Redirecting...");
+                        errorBox.style.color = "#059669"; // Green
+                        errorBox.style.backgroundColor = "#d1fae5";
+                        errorBox.style.borderColor = "#6ee7b7";
+                    }
+
+                } catch (error) {
+                    console.error("Network Error:", error);
+                    showError("Failed to connect to the banking server. Check your connection.");
+                } finally {
+                    // 8. Restore UI state
+                    submitBtn.disabled = false;
+                    btnText.style.display = 'inline-block';
+                    spinner.style.display = 'none';
+                }
+            });
+
+            // Helper to display error banner
+            function showError(msg) {
+                errorMessage.textContent = msg;
+                errorBox.style.display = 'flex';
+                // Reset to red in case it was changed to green
+                errorBox.style.color = "var(--error-red)";
+                errorBox.style.backgroundColor = "var(--error-bg)";
+                errorBox.style.borderColor = "#fca5a5";
+            }
+        });
+    </script>
+</body>
+</html>
