@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 
 from sandbox import analyze_url
 from pdfparser import extract_payload_from_pdf
+from db_manager import create_incident_record
 
 # Load environment variables from .env file
 load_dotenv()
@@ -50,6 +51,17 @@ def check_inbox():
                     print(f"NEW SCAM EMAIL CAPTURED!")
                     print(f"Attacker: {sender}")
                     print(f"Subject: {subject}")
+                    
+                    record_id = create_incident_record(
+                        incident_status="LURE_CAPTURED",
+                        attacker_contact=sender,
+                        channel="Email"
+                    )
+                    if record_id:
+                        record_id = str(record_id)
+                        print(f"[+] Incident recorded. Tracking ID: {record_id}")
+                    else:
+                        print("[-] Failed to initialize incident record.")
                     body = ""
                     if msg.is_multipart():
                         for part in msg.walk():
@@ -63,14 +75,14 @@ def check_inbox():
                                 extract_payload_from_pdf(file_bytes, filename)
                     else:
                         body = msg.get_payload(decode=True).decode()
-                    process_email_content(body)
+                    process_email_content(body, record_id)
 
     except Exception as e:
         print(f"Error connecting to Gmail: {e}")
     finally:
         mail.logout()
 
-def process_email_content(body):
+def process_email_content(body, record_id=None):
     print(" Scanning email body for malicious payloads...")
     
     # Use Regex to find URLs
@@ -80,7 +92,7 @@ def process_email_content(body):
         extracted_url = urls[0]
         print(f" THREAT DETECTED! Extracted URL: {extracted_url}")
         print("Ready to forward to Threat Analysis..")
-        analyze_url(extracted_url)
+        analyze_url(extracted_url, record_id)
         # NOTE: You can easily paste your VirusTotal function from the other script right here!
     else:
         print(" No URLs found in this email.")

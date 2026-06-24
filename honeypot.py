@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 from reply_engine import classify_branch, engine_status, get_lure_reply
 from sandbox import analyze_url
 from pdfparser import extract_payload_from_pdf, extract_payload_from_generic_media
+from db_manager import create_incident_record
 
 # Load environment variables from .env file
 load_dotenv()
@@ -57,6 +58,17 @@ def incoming_message():
     
     print(f"\n[WEBHOOK] New message from {sender_number}: {incoming_msg}")
     
+    # Create the database record immediately
+    record_id = create_incident_record(
+        incident_status="LURE_CAPTURED",
+        attacker_contact=sender_number,
+        channel="Twilio"
+    )
+    if record_id:
+        record_id = str(record_id)
+        print(f"[+] Incident recorded. Tracking ID: {record_id}")
+    else:
+        print("[-] Failed to initialize incident record.")
     # ========================================================
     # FEATURE: MEDIA & FILE INTERCEPTION & EXTRACTION STAGE
     # ========================================================
@@ -107,7 +119,7 @@ def incoming_message():
                     print(f"[ALERT] Extracted {len(extracted_urls)} URL(s) from media payload.")
                     for url in extracted_urls:
                         print(f"[ALERT] Embedded URL: {url}")
-                        analyze_url(url)
+                        analyze_url(url, record_id)
                 else:
                     print("[MEDIA] No embedded URLs extracted from media payload.")
 
@@ -139,7 +151,7 @@ def incoming_message():
     if urls:
         extracted_url = urls[0]
         print(f"[ALERT] URL/APK extracted from message body: {extracted_url}")
-        analyze_url(extracted_url)
+        analyze_url(extracted_url, record_id)
         
         return twiml_reply(
             get_lure_reply(

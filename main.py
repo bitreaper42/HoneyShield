@@ -7,10 +7,6 @@ from Email_lure import start_email_monitor
 from honeypot import start_flask_app
 
 def main():
-    print("="*60)
-    print("  HoneyShield - Unified Automated Threat Analysis Pipeline")
-    print("="*60)
-    
     # 1. Initialize Reply Engine
     init_engine()
     
