@@ -387,3 +387,9 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
     scan_apk(args.apk_path, args.brands_config, args.brands)
+    
+    # Trigger next pipeline step: apk_dynamic_sandbox.py
+    import subprocess
+    print(f"\n[*] Triggering next pipeline step: apk_dynamic_sandbox.py...")
+    subprocess.run([sys.executable, "src/analysis/apk_dynamic_sandbox.py", args.apk_path], check=True)
+

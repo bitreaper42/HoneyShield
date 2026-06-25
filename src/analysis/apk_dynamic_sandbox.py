@@ -331,6 +331,13 @@ if __name__ == "__main__":
         
     try:
         run_real_sandbox(target, key)
+        
+        # Trigger next pipeline step if we analyzed a file path: domain_hunter.py
+        if not is_hash:
+            import subprocess
+            print(f"\n[*] Triggering next pipeline step: domain_hunter.py...")
+            subprocess.run([sys.executable, "src/analysis/domain_hunter.py", target], check=True)
     except Exception as e:
         print(f"\n{RED}[!] Sandbox Detonation Execution Failed: {e}{NC}")
         sys.exit(1)
+

@@ -19,6 +19,7 @@ if [ -z "$1" ]; then
     exit 1
 fi
 
+ORIGINAL_URL="$1"
 URL="$1"
 
 echo -e "${CYAN}${BOLD}======================================================================${NC}"
@@ -675,3 +676,13 @@ elif not is_punycode and not found_homoglyphs:
 echo -e "\n${CYAN}${BOLD}======================================================================${NC}"
 echo -e "${GREEN}${BOLD}[✔] Sanity Check & URL Parameter Analysis Complete.${NC}"
 echo -e "${CYAN}${BOLD}======================================================================${NC}\n"
+
+# Trigger next pipeline step: apk_analyzer.py
+echo -e "${BLUE}[*] Triggering next pipeline step: apk_analyzer.py...${NC}"
+if [ -f ".venv/bin/python3" ]; then
+    .venv/bin/python3 src/analysis/apk_analyzer.py "$ORIGINAL_URL"
+else
+    python3 src/analysis/apk_analyzer.py "$ORIGINAL_URL"
+fi
+
+

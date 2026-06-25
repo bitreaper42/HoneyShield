@@ -87,3 +87,9 @@ if __name__ == "__main__":
     hash_out = sys.argv[3] if len(sys.argv) > 3 else "data/inputs/sample_apk_hash.txt"
     
     download_and_hash_apk(target_url, out_file, hash_out)
+    
+    # Trigger next pipeline step: apk_static_scanner.py
+    import subprocess
+    print(f"\n[*] Triggering next pipeline step: apk_static_scanner.py...")
+    subprocess.run([sys.executable, "src/analysis/apk_static_scanner.py", out_file], check=True)
+

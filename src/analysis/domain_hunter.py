@@ -211,3 +211,9 @@ if __name__ == "__main__":
         sys.exit(1)
         
     hunt_domains(sys.argv[1])
+    
+    # Trigger next pipeline step: request_detector.py
+    import subprocess
+    print(f"\n[*] Triggering next pipeline step: request_detector.py...")
+    subprocess.run([sys.executable, "src/analysis/request_detector.py", sys.argv[1]], check=True)
+
