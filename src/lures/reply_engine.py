@@ -178,6 +178,31 @@ def get_lure_reply(
     sender_id: str = "",
 ) -> str:
     resolved_branch = branch or classify_branch(incoming_msg)
+    
+    is_first_message = sender_id not in _history or len(_history[sender_id]) == 0
+    if is_first_message and resolved_branch != "greeting":
+        reply_text = "??"
+        print(f"[REPLY] First message not a greeting, replying with '??'")
+        _history_add(sender_id, "user", incoming_msg)
+        _history_add(sender_id, "assistant", reply_text)
+        return reply_text
+    
+    if len(_history.get(sender_id, [])) > 0:
+        last_msg = _history[sender_id][-1]
+        if last_msg.get("role") == "assistant" and last_msg.get("content") == "??":
+            reply_text = "its okay talk to the point who are you and what do you want."
+            print(f"[REPLY] Following up after '??' rejection")
+            _history_add(sender_id, "user", incoming_msg)
+            _history_add(sender_id, "assistant", reply_text)
+            return reply_text
+    
+    if resolved_branch in ("media_pdf", "media_apk", "media_other", "url"):
+        reply_text = "okay I will see it .."
+        print(f"[REPLY] Short-circuiting LLM for branch={resolved_branch}")
+        _history_add(sender_id, "user", incoming_msg)
+        _history_add(sender_id, "assistant", reply_text)
+        return reply_text
+
     llm_text = generate_llm_reply(incoming_msg, resolved_branch, sender_id)
 
     if llm_text:

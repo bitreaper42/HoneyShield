@@ -5,14 +5,15 @@ import re
 import os
 import io
 import hashlib
+import threading
 from pypdf import PdfReader
 from dotenv import load_dotenv
 
 from src.lures.reply_engine import classify_branch, engine_status, get_lure_reply
 from src.analysis.sandbox import analyze_url
 from src.analysis.pdfparser import extract_payload_from_pdf, extract_payload_from_generic_media
-from src.analysis.credential_store import get_or_create_credentials
-from Database_manager.db_manager import create_incident_record
+from src.Database_manager.db_manager import generate_and_assign_honeytokens
+from src.Database_manager.db_manager import create_incident_record, update_incident_record
 
 # Load environment variables from .env file
 load_dotenv()
@@ -60,17 +61,20 @@ def incoming_message():
     
     print(f"\n[WEBHOOK] New message from {sender_number}: {incoming_msg}")
     
-    # Create the database record immediately
-    record_id = create_incident_record(
-        incident_status="LURE_CAPTURED",
-        attacker_contact=sender_number,
-        channel="Twilio"
-    )
-    if record_id:
-        record_id = str(record_id)
-        print(f"[+] Incident recorded. Tracking ID: {record_id}")
-    else:
-        print("[-] Failed to initialize incident record.")
+    urls = re.findall(r'(https?://[^\s]+)', incoming_msg)
+    record_id = None
+    
+    if num_media > 0 or urls:
+        record_id = create_incident_record(
+            incident_status="LURE_CAPTURED",
+            attacker_contact=sender_number,
+            channel="Twilio"
+        )
+        if record_id:
+            record_id = str(record_id)
+            print(f"[+] Incident recorded. Tracking ID: {record_id}")
+        else:
+            print("[-] Failed to initialize incident record.")
     # ========================================================
     # FEATURE: MEDIA & FILE INTERCEPTION & EXTRACTION STAGE
     # ========================================================
@@ -109,8 +113,12 @@ def incoming_message():
                     file_hash = hashlib.sha256(file_bytes).hexdigest()
                     print(f"[MEDIA] Intercepted APK file. Calculated SHA-256: {file_hash}")
                     try:
-                        creds = get_or_create_credentials(file_hash)
-                        print(f"[MEDIA] Auto-generated threat credentials for APK: {creds}")
+                        if record_id:
+                            update_incident_record(record_id, apk_analysis={"apk_hash": file_hash})
+                            creds = generate_and_assign_honeytokens(record_id)
+                            print(f"[MEDIA] Auto-generated threat credentials for APK: {creds}")
+                        else:
+                            print(f"[MEDIA] Cannot assign credentials, no record_id available.")
                     except Exception as e:
                         print(f"[MEDIA] [!] Failed to auto-generate threat credentials: {e}")
                 else:
@@ -130,7 +138,7 @@ def incoming_message():
                     print(f"[ALERT] Extracted {len(extracted_urls)} URL(s) from media payload.")
                     for url in extracted_urls:
                         print(f"[ALERT] Embedded URL: {url}")
-                        analyze_url(url, record_id)
+                        threading.Thread(target=analyze_url, args=(url, record_id)).start()
                 else:
                     print("[MEDIA] No embedded URLs extracted from media payload.")
 
@@ -158,11 +166,10 @@ def incoming_message():
     # ==========================================
     # BRANCH 2: DIRECT URL EXTRACTION FROM TEXT
     # ==========================================
-    urls = re.findall(r'(https?://[^\s]+)', incoming_msg)
     if urls:
         extracted_url = urls[0]
         print(f"[ALERT] URL/APK extracted from message body: {extracted_url}")
-        analyze_url(extracted_url, record_id)
+        threading.Thread(target=analyze_url, args=(extracted_url, record_id)).start()
         
         return twiml_reply(
             get_lure_reply(

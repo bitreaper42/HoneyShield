@@ -8,7 +8,7 @@ import os
 from dotenv import load_dotenv
 
 
-from Database_manager.db_manager import create_incident_record
+from src.Database_manager.db_manager import create_incident_record
 from src.analysis.sandbox import analyze_url
 from src.analysis.pdfparser import extract_payload_from_pdf
 
@@ -28,6 +28,7 @@ def check_inbox():
         time.sleep(60) # Wait longer so we don't spam the console
         return
 
+    mail = None
     try:
         #Connects to the Gmail Server securely
         mail = imaplib.IMAP4_SSL(IMAP_SERVER)
@@ -81,7 +82,11 @@ def check_inbox():
     except Exception as e:
         print(f"Error connecting to Gmail: {e}")
     finally:
-        mail.logout()
+        if mail:
+            try:
+                mail.logout()
+            except:
+                pass
 
 def process_email_content(body, record_id=None):
     print(" Scanning email body for malicious payloads...")

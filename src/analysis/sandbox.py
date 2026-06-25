@@ -3,8 +3,8 @@ import os
 import requests
 import base64
 from dotenv import load_dotenv
-from Database_manager.db_manager import update_incident_record
-from Database_manager.db_manager import generate_and_assign_honeytokens
+from src.Database_manager.db_manager import update_incident_record
+from src.Database_manager.db_manager import generate_and_assign_honeytokens
 
 load_dotenv()
 VT_API_KEY = os.getenv("VT_API_KEY")
@@ -23,12 +23,7 @@ def run_sandbox(apk_url, record_id=None):
         ["python3", "src/analysis/apk_analyzer.py", apk_url],
         check=True
     )
-    
-    # Perform the interactive network sandbox analysis
-    subprocess.run(
-        ["bash", "scripts/interactive_analysis.sh", apk_url],
-        check=True
-    )
+
     
     if record_id:
         update_incident_record(
