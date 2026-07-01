@@ -6,20 +6,18 @@
 import os
 import sys
 import re
+import subprocess
 import zipfile
 import json
 import base64
 import argparse
 
-# Colors for terminal output
-RED = '\033[0;31m'
-GREEN = '\033[0;32m'
-YELLOW = '\033[1;33m'
-BLUE = '\033[0;34m'
-PURPLE = '\033[0;35m'
-CYAN = '\033[0;36m'
-NC = '\033[0m' # No Color
-BOLD = '\033[1m'
+# Shared utilities (colours, path bootstrap, string extractor)
+from src.analysis import (
+    RED, GREEN, YELLOW, BLUE, PURPLE, CYAN, NC, BOLD,
+    extract_strings_from_bytes
+)
+from src.Database_manager.db_manager import update_incident_record
 
 # Target Regex Patterns
 URL_PATTERN = re.compile(r'https?://[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(?:/[a-zA-Z0-9_.-]*)*')
@@ -46,27 +44,7 @@ DANGEROUS_PERMISSIONS = {
     'android.permission.ACCESS_FINE_LOCATION': 'Allows tracking precise GPS location.'
 }
 
-def extract_strings_from_bytes(data, min_len=4):
-    """Native string extraction supporting both UTF-8/ASCII and UTF-16LE binary XML formats."""
-    strings = []
-    
-    # Try UTF-8 / ASCII
-    try:
-        text_utf8 = data.decode('utf-8', errors='ignore')
-        words_utf8 = re.findall(r'[\x20-\x7E]{' + str(min_len) + ',}', text_utf8)
-        strings.extend(words_utf8)
-    except Exception:
-        pass
-        
-    # Try UTF-16LE (very common in compiled Android XML/resource binaries)
-    try:
-        text_utf16 = data.decode('utf-16le', errors='ignore')
-        words_utf16 = re.findall(r'[\x20-\x7E]{' + str(min_len) + ',}', text_utf16)
-        strings.extend(words_utf16)
-    except Exception:
-        pass
-        
-    return list(set(s.strip() for s in strings))
+
 
 def extract_package_name(manifest_strings):
     """Heuristic helper to resolve the main Android package name from binary XML string pool."""
@@ -127,8 +105,7 @@ def load_brands(config_path="config/monitored_brands.json", custom_brands_str=No
 
 def scan_apk(apk_path, config_path="config/monitored_brands.json", custom_brands=None):
     if not os.path.exists(apk_path):
-        print(f"{RED}[!] Error: File not found at {apk_path}{NC}")
-        sys.exit(1)
+        raise Exception(f"File not found at {apk_path}")
         
     print(f"{CYAN}{BOLD}======================================================================{NC}")
     print(f"{CYAN}{BOLD}              HoneyShield Static APK Threat Analyzer                  {NC}")
@@ -367,17 +344,18 @@ def scan_apk(apk_path, config_path="config/monitored_brands.json", custom_brands
         print(f"  Risk Level: {color}{BOLD}{results['risk_level']}{NC}")
         print(f"{CYAN}{BOLD}======================================================================{NC}")
         
-        output_json_path = "data/outputs/apk_scan_results.json"
+        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
+        output_json_path = os.path.join(project_root, "data/outputs/apk_scan_results.json")
         with open(output_json_path, "w") as jf:
             json.dump(results, jf, indent=4)
         print(f"[+] Static scan JSON results saved to: {output_json_path}\n")
         
+        return results
+        
     except zipfile.BadZipFile:
-        print(f"{RED}[!] Error: File is not a valid zip container (corrupt APK).{NC}")
-        sys.exit(1)
+        raise Exception("File is not a valid zip container (corrupt APK).")
     except Exception as e:
-        print(f"{RED}[!] Error during static analysis: {str(e)}{NC}")
-        sys.exit(1)
+        raise Exception(f"Error during static analysis: {str(e)}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="HoneyShield Static APK Threat Analyzer")
@@ -386,10 +364,13 @@ if __name__ == "__main__":
     parser.add_argument("--brands", help="Custom brand specifications override. Format: 'brand1:pkg1,pkg2;brand2:pkg3'")
     
     args = parser.parse_args()
-    scan_apk(args.apk_path, args.brands_config, args.brands)
     
-    # Trigger next pipeline step: apk_dynamic_sandbox.py
-    import subprocess
-    print(f"\n[*] Triggering next pipeline step: apk_dynamic_sandbox.py...")
-    subprocess.run([sys.executable, "src/analysis/apk_dynamic_sandbox.py", args.apk_path], check=True)
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
+    brands_config_abs = os.path.join(project_root, args.brands_config) if not os.path.isabs(args.brands_config) else args.brands_config
+    
+    try:
+        results = scan_apk(args.apk_path, brands_config_abs, args.brands)
+        print("Static analysis completed successfully.")
+    except Exception as e:
+        print(f"Error: {e}")
 

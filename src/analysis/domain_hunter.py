@@ -4,21 +4,18 @@
 # Extracts strings from classes.dex, AndroidManifest.xml, and resources.arsc.
 
 import os
-import sys
 import re
 import zipfile
 import json
 from urllib.parse import urlparse
+import argparse
 
-# Colors for terminal output
-RED = '\033[0;31m'
-GREEN = '\033[0;32m'
-YELLOW = '\033[1;33m'
-BLUE = '\033[0;34m'
-PURPLE = '\033[0;35m'
-CYAN = '\033[0;36m'
-NC = '\033[0m' # No Color
-BOLD = '\033[1m'
+# Shared utilities (colours, path bootstrap, string extractor)
+from src.analysis import (
+    RED, GREEN, YELLOW, BLUE, PURPLE, CYAN, NC, BOLD,
+    extract_strings_from_bytes
+)
+from src.Database_manager.db_manager import update_incident_record
 
 # Regular expressions
 URL_PATTERN = re.compile(r'https?://[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(?::\d+)?(?:/(?:(?!https?://)[^\s<>"\'\]{}();,])*)?', re.IGNORECASE)
@@ -43,27 +40,6 @@ EXCLUDED_EXTENSIONS = {
     '.zip', '.tar', '.gz', '.rar'
 }
 
-def extract_strings_from_bytes(data, min_len=4):
-    """Extract readable strings using UTF-8/ASCII and UTF-16LE mappings from binary files."""
-    strings = []
-    
-    # Try UTF-8 / ASCII
-    try:
-        text_utf8 = data.decode('utf-8', errors='ignore')
-        words_utf8 = re.findall(r'[\x20-\x7E]{' + str(min_len) + ',}', text_utf8)
-        strings.extend(words_utf8)
-    except Exception:
-        pass
-        
-    # Try UTF-16LE (common in compiled Android resources/binary XMLs)
-    try:
-        text_utf16 = data.decode('utf-16le', errors='ignore')
-        words_utf16 = re.findall(r'[\x20-\x7E]{' + str(min_len) + ',}', text_utf16)
-        strings.extend(words_utf16)
-    except Exception:
-        pass
-        
-    return list(set(s.strip() for s in strings))
 
 def clean_domain(domain_str):
     """Normalize domain strings by stripping subdomains and whitespace."""
@@ -99,8 +75,7 @@ def hunt_domains(apk_path):
     print(f"[*] Target APK: {BOLD}{os.path.basename(apk_path)}{NC}")
     
     if not os.path.exists(apk_path):
-        print(f"{RED}[!] Error: File not found at {apk_path}{NC}")
-        sys.exit(1)
+        raise Exception(f"File not found at {apk_path}")
         
     found_urls = set()
     found_ips = set()
@@ -146,8 +121,7 @@ def hunt_domains(apk_path):
                     print(f"{YELLOW}[!] Error reading {target_name}: {e}{NC}")
                     
     except Exception as e:
-        print(f"{RED}[!] Error opening APK zip package: {e}{NC}")
-        sys.exit(1)
+        raise Exception(f"Error opening APK zip package: {e}")
         
     # Process and filter findings
     final_ips = sorted(list(found_ips))
@@ -199,21 +173,25 @@ def hunt_domains(apk_path):
         "all_extracted_urls": sorted(list(found_urls))
     }
     
-    output_path = "data/outputs/hunted_domains.json"
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
+    output_path = os.path.join(project_root, "data/outputs/hunted_domains.json")
     with open(output_path, "w") as f:
         json.dump(output_data, f, indent=4)
         
     print(f"\n{CYAN}[+] Hunt complete. JSON results exported to: {output_path}{NC}\n")
+    return output_data
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python3 domain_hunter.py <path_to_apk>")
-        sys.exit(1)
-        
-    hunt_domains(sys.argv[1])
+    parser = argparse.ArgumentParser(description="HoneyShield Domain Hunter")
+    parser.add_argument("apk_path", help="Path to the target APK")
     
-    # Trigger next pipeline step: request_detector.py
-    import subprocess
-    print(f"\n[*] Triggering next pipeline step: request_detector.py...")
-    subprocess.run([sys.executable, "src/analysis/request_detector.py", sys.argv[1]], check=True)
+    args = parser.parse_args()
+    
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
+    
+    try:
+        results = hunt_domains(args.apk_path)
+        print("Domain hunting completed successfully.")
+    except Exception as e:
+        print(f"Error: {e}")
 

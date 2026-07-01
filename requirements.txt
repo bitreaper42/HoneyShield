@@ -13,4 +13,7 @@ python-dotenv==1.2.2
 requests==2.33.1
 urllib3==2.6.3
 Werkzeug==3.1.8
-redis
+
+# --- Cross-platform URL sanity check (url_sanity_check.py) ---
+python-whois
+dnspython

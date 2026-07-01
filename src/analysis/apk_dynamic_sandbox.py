@@ -6,19 +6,15 @@
 import os
 import sys
 import time
+import subprocess
 import json
 import hashlib
 import requests
+import argparse
 
-# Colors for terminal output
-RED = '\033[0;31m'
-GREEN = '\033[0;32m'
-YELLOW = '\033[1;33m'
-BLUE = '\033[0;34m'
-PURPLE = '\033[0;35m'
-CYAN = '\033[0;36m'
-NC = '\033[0m' # No Color
-BOLD = '\033[1m'
+# Shared utilities (colours, path bootstrap)
+from src.analysis import RED, GREEN, YELLOW, BLUE, PURPLE, CYAN, NC, BOLD
+from src.Database_manager.db_manager import update_incident_record
 
 VT_API_URL = "https://www.virustotal.com/api/v3"
 
@@ -306,38 +302,35 @@ def run_real_sandbox(target, api_key):
             print(f"  - {sig}")
             
     # Output to standard JSON results file
-    output_path = "data/outputs/apk_dynamic_results.json"
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
+    output_path = os.path.join(project_root, "data/outputs/apk_dynamic_results.json")
     with open(output_path, "w") as f:
         json.dump(results, f, indent=4)
     print(f"\n[+] Dynamic analysis JSON results saved to: {output_path}\n")
+    
+    return results
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python3 apk_dynamic_sandbox.py <path_to_apk_or_sha256>")
-        sys.exit(1)
-        
-    target = sys.argv[1]
+    parser = argparse.ArgumentParser(description="HoneyShield Dynamic Sandbox")
+    parser.add_argument("target", help="Path to APK or SHA-256 hash")
+    parser.add_argument("--record-id", type=str, help="MongoDB tracking record ID", default=None)
+    
+    args = parser.parse_args()
+    target = args.target
+    
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
     
     is_hash = len(target) == 64 and all(c in "0123456789abcdefABCDEF" for c in target)
     if not is_hash and not os.path.exists(target):
-        print(f"{RED}[!] Error: File not found at {target}{NC}")
-        sys.exit(1)
+        raise Exception(f"File not found at {target}")
         
     key = load_env_key()
     if not key:
-        print(f"{RED}[!] Error: VT_API_KEY environment variable is not configured.{NC}")
-        print("    Please set VT_API_KEY in your .env file or environment.")
-        sys.exit(1)
+        raise Exception("VT_API_KEY environment variable is not configured. Please set VT_API_KEY in your .env file or environment.")
         
     try:
-        run_real_sandbox(target, key)
-        
-        # Trigger next pipeline step if we analyzed a file path: domain_hunter.py
-        if not is_hash:
-            import subprocess
-            print(f"\n[*] Triggering next pipeline step: domain_hunter.py...")
-            subprocess.run([sys.executable, "src/analysis/domain_hunter.py", target], check=True)
+        results = run_real_sandbox(target, key)
+        print("Dynamic sandbox completed successfully.")
     except Exception as e:
-        print(f"\n{RED}[!] Sandbox Detonation Execution Failed: {e}{NC}")
-        sys.exit(1)
+        print(f"Error: {e}")
 

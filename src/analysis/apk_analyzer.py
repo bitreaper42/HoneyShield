@@ -4,12 +4,16 @@
 
 import os
 import sys
+import subprocess
 import hashlib
 import urllib.request
+import argparse
 from urllib.error import URLError, HTTPError
 
-# Ensure correct package import path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+# Path bootstrap and DB import (sys.path resolved by src.analysis package __init__)
+from src.analysis import RED, GREEN, YELLOW, CYAN, NC, BOLD
+from src.Database_manager.db_manager import update_incident_record
+
 
 
 # Configurable limits
@@ -32,8 +36,7 @@ def download_and_hash_apk(url, output_path="data/inputs/sample.apk", hash_output
             if content_length:
                 size_in_bytes = int(content_length)
                 if size_in_bytes > MAX_FILE_SIZE:
-                    print(f"[!] Error: File size exceeds the maximum limit ({size_in_bytes / (1024*1024):.2f}MB > {MAX_FILE_SIZE / (1024*1024)}MB). Aborting download.")
-                    sys.exit(2)
+                    raise Exception(f"File size exceeds the maximum limit ({size_in_bytes / (1024*1024):.2f}MB > {MAX_FILE_SIZE / (1024*1024)}MB).")
             
             # Stream download in chunks of 1MB
             with open(output_path, "wb") as f:
@@ -44,10 +47,9 @@ def download_and_hash_apk(url, output_path="data/inputs/sample.apk", hash_output
                     
                     bytes_downloaded += len(chunk)
                     if bytes_downloaded > MAX_FILE_SIZE:
-                        print(f"[!] Error: File size limit exceeded during transfer ({bytes_downloaded / (1024*1024):.2f}MB > {MAX_FILE_SIZE / (1024*1024)}MB). Deleting partial file.")
                         f.close()
                         os.remove(output_path)
-                        sys.exit(2)
+                        raise Exception(f"File size limit exceeded during transfer ({bytes_downloaded / (1024*1024):.2f}MB > {MAX_FILE_SIZE / (1024*1024)}MB).")
                     
                     f.write(chunk)
                     sha256.update(chunk)
@@ -63,33 +65,33 @@ def download_and_hash_apk(url, output_path="data/inputs/sample.apk", hash_output
             hf.write(file_hash + "\n")
         print(f"[+] SHA-256 hash saved to: {hash_output_path}")
         
-        return file_hash
+        return output_path, file_hash
         
     except HTTPError as e:
-        print(f"[!] HTTP Error downloading APK: {e.code} - {e.reason}")
-        sys.exit(1)
+        error_body = e.read().decode('utf-8', errors='ignore')
+        raise Exception(f"HTTP Error downloading APK: {e.code} - {e.reason}. Response: {error_body}")
     except URLError as e:
-        print(f"[!] Connection Error downloading APK: {e.reason}")
-        sys.exit(1)
+        raise Exception(f"Connection Error downloading APK: {e.reason}")
     except Exception as e:
-        print(f"[!] Unexpected Error during download: {str(e)}")
         if os.path.exists(output_path):
             os.remove(output_path)
-        sys.exit(1)
+        raise e
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python3 apk_analyzer.py <APK_URL> [output_file] [hash_output_file]")
-        sys.exit(1)
-        
-    target_url = sys.argv[1]
-    out_file = sys.argv[2] if len(sys.argv) > 2 else "data/inputs/sample.apk"
-    hash_out = sys.argv[3] if len(sys.argv) > 3 else "data/inputs/sample_apk_hash.txt"
+    parser = argparse.ArgumentParser(description="HoneyShield APK Analyzer")
+    parser.add_argument("target_url", help="URL to download APK from")
+    parser.add_argument("out_file", nargs='?', default="data/inputs/sample.apk", help="Output APK path")
+    parser.add_argument("hash_out", nargs='?', default="data/inputs/sample_apk_hash.txt", help="Output hash path")
     
-    download_and_hash_apk(target_url, out_file, hash_out)
+    args = parser.parse_args()
     
-    # Trigger next pipeline step: apk_static_scanner.py
-    import subprocess
-    print(f"\n[*] Triggering next pipeline step: apk_static_scanner.py...")
-    subprocess.run([sys.executable, "src/analysis/apk_static_scanner.py", out_file], check=True)
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
+    out_file_abs = os.path.join(project_root, args.out_file) if not os.path.isabs(args.out_file) else args.out_file
+    hash_out_abs = os.path.join(project_root, args.hash_out) if not os.path.isabs(args.hash_out) else args.hash_out
+    
+    try:
+        apk_path, file_hash = download_and_hash_apk(args.target_url, out_file_abs, hash_out_abs)
+        print(f"Success: {apk_path} - {file_hash}")
+    except Exception as e:
+        print(f"Error: {e}")
 

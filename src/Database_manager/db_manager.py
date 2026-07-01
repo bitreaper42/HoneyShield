@@ -200,7 +200,46 @@ def update_incident_record(record_id, **kwargs):
         print(f"Failed to update incident record: {e}")
         return False
 
+def get_incident_record(record_id):
+    """
+    Retrieves a full incident document from the honey_credentials collection
+    by its MongoDB ObjectId.
+
+    Args:
+        record_id (str | ObjectId): The string or ObjectId of the incident document.
+
+    Returns:
+        dict: The full document dictionary if found, or None if the record does
+              not exist or the database connection fails.
+    """
+    db = get_database()
+    if db is None:
+        print("Database connection not established. Cannot retrieve record.")
+        return None
+
+    collection = db[COLLECTION_NAME]
+
+    try:
+        from bson.objectid import ObjectId
+        # Normalize to ObjectId whether a string or ObjectId was passed in
+        if isinstance(record_id, str):
+            record_id = ObjectId(record_id)
+
+        document = collection.find_one({"_id": record_id})
+
+        if document is None:
+            print(f"[get_incident_record] No record found with ID: {record_id}")
+            return None
+
+        print(f"[get_incident_record] Successfully retrieved record: {record_id}")
+        return document
+
+    except Exception as e:
+        print(f"[get_incident_record] Failed to retrieve incident record: {e}")
+        return None
+
 def generate_and_assign_honeytokens(record_id):
+
     """
     Generates realistic synthetic Indian banking credentials for honeytoken
     injection during dynamic sandbox analysis, persists them to the incident
