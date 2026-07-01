@@ -10,7 +10,9 @@ from dotenv import load_dotenv
 
 from src.Database_manager.db_manager import create_incident_record
 from src.analysis.sandbox import analyze_url
-from src.analysis.pdfparser import extract_payload_from_pdf
+# Payload parsers — now live in the lures layer
+from src.lures.pdfparser import extract_payload_from_pdf
+from src.lures.zipparser import extract_payload_from_zip
 
 # Load environment variables from .env file
 load_dotenv()
@@ -74,7 +76,14 @@ def check_inbox():
                                 file_bytes = part.get_payload(decode=True)
                                 filename = part.get_filename() or "attachment.pdf"
                                 print(f" [EMAIL] Found PDF attachment: {filename}")
-                                extract_payload_from_pdf(file_bytes, filename)
+                                urls_in_pdf, _ = extract_payload_from_pdf(
+                                    file_bytes, filename, record_id
+                                )
+                            elif "zip" in content_type or (part.get_filename() or "").endswith(".zip"):
+                                file_bytes = part.get_payload(decode=True)
+                                filename = part.get_filename() or "attachment.zip"
+                                print(f" [EMAIL] Found ZIP attachment: {filename}")
+                                extract_payload_from_zip(file_bytes, filename, record_id)
                     else:
                         body = msg.get_payload(decode=True).decode()
                     process_email_content(body, record_id)
@@ -90,16 +99,15 @@ def check_inbox():
 
 def process_email_content(body, record_id=None):
     print(" Scanning email body for malicious payloads...")
-    
-    # Use Regex to find URLs
+
+    # ── Generic HTTP/HTTPS URLs ───────────────────────────────────────────
     urls = re.findall(r'(https?://[^\s]+)', body)
-    
+
     if urls:
         extracted_url = urls[0]
         print(f" THREAT DETECTED! Extracted URL: {extracted_url}")
         print("Ready to forward to Threat Analysis..")
         analyze_url(extracted_url, record_id)
-        # NOTE: You can easily paste your VirusTotal function from the other script right here!
     else:
         print(" No URLs found in this email.")
 

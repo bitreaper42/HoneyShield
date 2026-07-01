@@ -182,7 +182,7 @@ def _check_redirects(url_with_scheme: str, domain: str) -> dict:
     if result["is_shortener"]:
         print(f"  {RED}{BOLD}[!] ALERT: URL Shortener Detected ({domain})!{NC}")
     else:
-        print(f"  {GREEN}[✔] URL is not using a known shortener service.{NC}")
+        print(f"  {GREEN}[+] URL is not using a known shortener service.{NC}")
 
     print(f"  {CYAN}[*] Hops trace:{NC}")
     try:
@@ -376,14 +376,14 @@ def _check_ip_and_asn(domain: str) -> dict:
         if result["cdn_detected"]:
             note = (f"Cloud infrastructure ({', '.join(result['cloud_detected'])}) is "
                     f"protected behind a CDN ({', '.join(result['cdn_detected'])}).")
-            print(f"      {GREEN}[✔] {note}{NC}")
+            print(f"      {GREEN}[+] {note}{NC}")
         else:
             note = (f"Exposed Cloud/VPS Host detected ({', '.join(result['cloud_detected'])}) "
                     f"without CDN proxy — common for ad-hoc malware C2s and phishing hosts.")
             print(f"      {YELLOW}[!] WARNING: {note}{NC}")
         result["infrastructure_notes"].append(note)
     elif not result["cdn_detected"]:
-        print(f"      {GREEN}[✔] No direct raw cloud hosting detected (Standard Hosting).{NC}")
+        print(f"      {GREEN}[+] No direct raw cloud hosting detected (Standard Hosting).{NC}")
 
     return result
 
@@ -457,7 +457,7 @@ def _check_tls(domain: str, scheme: str) -> dict:
         elif result["days_remaining"] is not None and result["days_remaining"] < 7:
             print(f"  {YELLOW}[!] WARNING: Certificate expires in {result['days_remaining']} days!{NC}")
         elif result["days_remaining"] is not None:
-            print(f"  {GREEN}[✔]{NC} Certificate is valid for another {result['days_remaining']} days.")
+            print(f"  {GREEN}[+] Certificate is valid for another {result['days_remaining']} days.")
 
         if sans:
             print(f"  {GREEN}[+]{NC} SANs: {', '.join(sans[:5])}{'...' if len(sans) > 5 else ''}")
@@ -619,7 +619,7 @@ def _check_url_structure(url: str) -> dict:
                     except Exception:
                         pass
     else:
-        print(f"  {GREEN}[✔]{NC} No Query Parameters detected.")
+        print(f"  {GREEN}[+]{NC} No Query Parameters detected.")
 
     return result
 
@@ -704,7 +704,7 @@ def _check_entropy_and_homoglyphs(domain: str, url: str) -> dict:
         result["mixed_scripts"] = True
         result["warnings"].append(msg)
     elif not is_punycode and not found_homoglyphs:
-        print(f"  {GREEN}[✔]{NC} Domain uses standard scripts. No homoglyphs detected.")
+        print(f"  {GREEN}[+]{NC} Domain uses standard scripts. No homoglyphs detected.")
 
     return result
 
@@ -804,7 +804,7 @@ def perform_url_sanity_check(url: str) -> dict:
         results["entropy_homoglyphs"] = {"error": str(exc)}
 
     print(f"\n{CYAN}{BOLD}{'=' * 70}{NC}")
-    print(f"{GREEN}{BOLD}[✔] Sanity Check & URL Parameter Analysis Complete.{NC}")
+    print(f"{GREEN}{BOLD}[+] Sanity Check & URL Parameter Analysis Complete.{NC}")
     print(f"{CYAN}{BOLD}{'=' * 70}{NC}\n")
 
     return results

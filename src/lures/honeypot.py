@@ -3,15 +3,15 @@ import requests
 import base64
 import re
 import os
-import io
 import hashlib
 import threading
-from pypdf import PdfReader
 from dotenv import load_dotenv
 
 from src.lures.reply_engine import classify_branch, engine_status, get_lure_reply
-from src.analysis.sandbox import analyze_url
-from src.analysis.pdfparser import extract_payload_from_pdf, extract_payload_from_generic_media
+from src.analysis.sandbox import analyze_url, run_sandbox_from_file
+# Payload parsers — now live in the lures layer
+from src.lures.pdfparser import extract_payload_from_pdf, extract_payload_from_generic_media
+from src.lures.zipparser import extract_payload_from_zip
 from src.Database_manager.db_manager import generate_and_assign_honeytokens
 from src.Database_manager.db_manager import create_incident_record, update_incident_record
 
@@ -58,12 +58,12 @@ def incoming_message():
     incoming_msg = request.form.get('Body', '').lower()
     sender_number = request.form.get('From', '')
     num_media = int(request.form.get('NumMedia', 0))
-    
+
     print(f"\n[WEBHOOK] New message from {sender_number}: {incoming_msg}")
-    
+
     urls = re.findall(r'(https?://[^\s]+)', incoming_msg)
     record_id = None
-    
+
     if num_media > 0 or urls:
         record_id = create_incident_record(
             incident_status="LURE_CAPTURED",
@@ -112,6 +112,25 @@ def incoming_message():
                     # Calculate SHA-256 hash and pre-generate unique threat credentials
                     file_hash = hashlib.sha256(file_bytes).hexdigest()
                     print(f"[MEDIA] Intercepted APK file. Calculated SHA-256: {file_hash}")
+                    
+                    # ── FEATURE: SAVE TO DISK & DETONATE ──
+                    try:
+                        quarantine_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../quarantine'))
+                        os.makedirs(quarantine_dir, exist_ok=True)
+                        apk_path = os.path.join(quarantine_dir, f"{file_hash}.apk")
+                        
+                        with open(apk_path, "wb") as f:
+                            f.write(file_bytes)
+                        print(f"[MEDIA] Saved APK to disk: {apk_path}")
+                        
+                        # Trigger local detonation pipeline
+                        print(f"[MEDIA] Dispatching local file to Detonation Pipeline...")
+                        threading.Thread(target=run_sandbox_from_file, args=(apk_path, record_id)).start()
+                        
+                    except Exception as e:
+                        print(f"[MEDIA] [!] Failed to save or detonate local APK: {e}")
+
+                    # ── FEATURE: THREAT CREDENTIALS ──
                     try:
                         if record_id:
                             update_incident_record(record_id, apk_analysis={"apk_hash": file_hash})
@@ -130,9 +149,17 @@ def incoming_message():
                 extracted_urls = []
                 suspicious_indicators = []
                 if "pdf" in media_type or filename.endswith('.pdf'):
-                    extracted_urls, suspicious_indicators = extract_payload_from_pdf(file_bytes, filename)
+                    extracted_urls, suspicious_indicators = extract_payload_from_pdf(
+                        file_bytes, filename, record_id
+                    )
+                elif "zip" in media_type or filename.endswith('.zip'):
+                    extracted_urls, suspicious_indicators = extract_payload_from_zip(
+                        file_bytes, filename, record_id
+                    )
                 else:
-                    extracted_urls, suspicious_indicators = extract_payload_from_generic_media(file_bytes, filename)
+                    extracted_urls, suspicious_indicators = extract_payload_from_generic_media(
+                        file_bytes, filename, record_id
+                    )
 
                 if extracted_urls:
                     print(f"[ALERT] Extracted {len(extracted_urls)} URL(s) from media payload.")
@@ -170,7 +197,7 @@ def incoming_message():
         extracted_url = urls[0]
         print(f"[ALERT] URL/APK extracted from message body: {extracted_url}")
         threading.Thread(target=analyze_url, args=(extracted_url, record_id)).start()
-        
+
         return twiml_reply(
             get_lure_reply(
                 incoming_msg,

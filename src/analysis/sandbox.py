@@ -120,6 +120,97 @@ def run_sandbox_pipeline(apk_url, record_id=None):
             update_incident_record(record_id=record_id, incident_status="PIPELINE_FAILED")
 
 
+def run_sandbox_from_file(file_path, record_id=None):
+    """
+    Direct Detonation Pipeline for APK files saved locally (e.g., from direct upload or ZIP extraction).
+    Bypasses URL Sanity Checks and the Download Phase.
+    """
+    try:
+        print(f"\n[PIPELINE] Starting direct file detonation orchestration for: {file_path}")
+        
+        # Pre-requisite: Generate Honeytokens
+        tokens = generate_and_assign_honeytokens(record_id)
+
+        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
+        brands_config_abs = os.path.join(project_root, "config/monitored_brands.json")
+        
+        # DB Update Phase 1 Bypass
+        if record_id:
+            update_incident_record(
+                record_id=record_id,
+                incident_status="APK_DOWNLOADED"
+            )
+            print(f"[PIPELINE] DB updated to APK_DOWNLOADED (File already local)")
+
+        # --- PHASE 2: Static Scanner ---
+        print("\n[PIPELINE] -> Phase 2: Static Scanning")
+        static_results = scan_apk(file_path, brands_config_abs)
+        if record_id:
+            update_incident_record(
+                record_id=record_id,
+                incident_status="STATIC_ANALYSIS_COMPLETED",
+                apk_analysis={
+                    "risk_score": static_results.get("risk_score"),
+                    "scanner_json_report": static_results
+                }
+            )
+            print(f"[PIPELINE] DB updated to STATIC_ANALYSIS_COMPLETED")
+            
+        # --- PHASE 3: Dynamic Sandbox ---
+        print("\n[PIPELINE] -> Phase 3: Dynamic Sandbox")
+        vt_key = load_env_key()
+        if not vt_key:
+            raise Exception("VT_API_KEY missing.")
+        dynamic_results = run_real_sandbox(file_path, vt_key)
+        if record_id:
+            update_incident_record(
+                record_id=record_id,
+                incident_status="DYNAMIC_ANALYSIS_COMPLETED",
+                osint_analysis={
+                    "virustotal_score": f"{dynamic_results.get('threat_score', 0)}/100",
+                    "sandbox_behaviors": dynamic_results.get("signatures_triggered", [])
+                }
+            )
+            print(f"[PIPELINE] DB updated to DYNAMIC_ANALYSIS_COMPLETED")
+            
+        # --- PHASE 4: C2 Domain Hunter ---
+        print("\n[PIPELINE] -> Phase 4: Domain Hunter")
+        domain_results = hunt_domains(file_path)
+        if record_id:
+            update_incident_record(
+                record_id=record_id,
+                incident_status="C2_DOMAINS_ISOLATED",
+                osint_analysis={
+                    "infrastructure_audit": domain_results,
+                    "c2_endpoints_discovered": domain_results.get("suspicious_domains", [])
+                }
+            )
+            print(f"[PIPELINE] DB updated to C2_DOMAINS_ISOLATED")
+            
+        # --- PHASE 5: Request Detector (Trap Arming) ---
+        print("\n[PIPELINE] -> Phase 5: Request Detector (Probing)")
+        detection_results = run_detection(file_path, record_id)
+        if record_id:
+            endpoints = detection_results.get("probed_endpoints", [])
+            final_status = "TRAP_READY" if endpoints else "C2_PROBED_SUCCESSFULLY"
+            update_incident_record(
+                record_id=record_id,
+                incident_status=final_status,
+                osint_analysis={
+                    "c2_base_url": detection_results.get("c2_base_url"),
+                    "active_endpoints": endpoints
+                }
+            )
+            print(f"[PIPELINE] DB updated to {final_status}")
+
+        print("\n[PIPELINE] [+] Full HoneyShield Local File Detonation Pipeline Completed Successfully!")
+
+    except Exception as e:
+        print(f"\n[PIPELINE] [!] Pipeline Execution Failed: {e}")
+        if record_id:
+            update_incident_record(record_id=record_id, incident_status="PIPELINE_FAILED")
+
+
 def run_sandbox(apk_url, record_id=None):
     """Wrapper to maintain backward compatibility, runs pipeline directly."""
     run_sandbox_pipeline(apk_url, record_id)
