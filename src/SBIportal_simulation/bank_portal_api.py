@@ -35,8 +35,18 @@ def get_database():
 # Initialize database collection
 collection = get_database()
 
-@app.route('/api/login', methods=['POST'])
+@app.after_request
+def after_request(response):
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+    return response
+
+@app.route('/api/login', methods=['POST', 'OPTIONS'])
 def api_login():
+    if request.method == 'OPTIONS':
+        return '', 200
+
     if collection is None:
         return jsonify({"error": "Database connection error."}), 500
 
@@ -101,8 +111,14 @@ def api_login():
             "status": "fail"
         }), 401
 
-if __name__ == '__main__':
+
+def start_bank_portal():
+    """Entry point for launching the Bank Portal API from main.py as a background thread."""
     print("--- HoneyShield Bank Portal API Active on Port 8080 ---")
     if collection is None:
         print("[!] Warning: MongoDB connection failed on startup. Please check your .env file.")
-    app.run(host='0.0.0.0', port=8080)
+    app.run(host='0.0.0.0', port=8080, use_reloader=False)
+
+if __name__ == '__main__':
+    start_bank_portal()
+
