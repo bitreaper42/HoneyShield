@@ -125,7 +125,9 @@ def create_incident_record(**kwargs):
             "apk_hash": kwargs.get("apk_hash"),
             "impersonated_brand": kwargs.get("impersonated_brand"),
             "risk_score": kwargs.get("risk_score"),
-            "scanner_json_report": kwargs.get("scanner_json_report", {})
+            "scanner_json_report": kwargs.get("scanner_json_report", {}),
+            "accessibility_abuse_detected": kwargs.get("accessibility_abuse_detected", False),
+            "evasion_tactics": kwargs.get("evasion_tactics", [])
         },
         
         "honeytokens": {
@@ -198,6 +200,36 @@ def update_incident_record(record_id, **kwargs):
         return True
     except Exception as e:
         print(f"Failed to update incident record: {e}")
+        return False
+
+def remove_incident_ttl(record_id):
+    """
+    Removes the 'createdAt' field from the document, which removes the TTL flag
+    so it is saved permanently as high-priority evidence.
+    """
+    db = get_database()
+    if db is None:
+        return False
+        
+    collection = db[COLLECTION_NAME]
+    try:
+        from bson.objectid import ObjectId
+        if isinstance(record_id, str):
+            record_id = ObjectId(record_id)
+            
+        result = collection.update_one(
+            {"_id": record_id},
+            {"$unset": {"createdAt": ""}}
+        )
+        
+        if result.matched_count == 0:
+            print(f"No record found with ID: {record_id}")
+            return False
+            
+        print(f"Successfully removed TTL index for record {record_id}. It will be saved permanently.")
+        return True
+    except Exception as e:
+        print(f"Failed to remove TTL index: {e}")
         return False
 
 def get_incident_record(record_id):
@@ -342,6 +374,8 @@ if __name__ == '__main__':
         impersonated_brand="TargetBank",
         risk_score=9.5,
         scanner_json_report={"malware_family": "FakeBanker", "detected_permissions": ["SMS_READ"]},
+        accessibility_abuse_detected=True,
+        evasion_tactics=["BIND_ACCESSIBILITY_SERVICE"],
         honeytoken_username="honey_user_1337",
         honeytoken_password="Password123!",
         honeytoken_virtual_otp="883399"
@@ -350,5 +384,9 @@ if __name__ == '__main__':
     if record_id:
         print(f"\nTest completed successfully. Document ID: {record_id}")
         print("Note: The 'forensic_intercept' fields are correctly set to None per requirements.")
+        
+        # Test TTL removal
+        print("\n--- Testing TTL Removal (Accessibility Abuse Detected) ---")
+        remove_incident_ttl(record_id)
     else:
         print("\nTest failed. Could not insert document.")

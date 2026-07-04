@@ -4,7 +4,7 @@ import base64
 import threading
 from dotenv import load_dotenv
 
-from src.Database_manager.db_manager import update_incident_record, generate_and_assign_honeytokens
+from src.Database_manager.db_manager import update_incident_record, generate_and_assign_honeytokens, remove_incident_ttl
 from src.analysis.apk_analyzer import download_and_hash_apk
 from src.analysis.apk_static_scanner import scan_apk
 from src.analysis.apk_dynamic_sandbox import run_real_sandbox, load_env_key
@@ -60,10 +60,15 @@ def run_sandbox_pipeline(apk_url, record_id=None):
                 incident_status="STATIC_ANALYSIS_COMPLETED",
                 apk_analysis={
                     "risk_score": static_results.get("risk_score"),
-                    "scanner_json_report": static_results
+                    "scanner_json_report": static_results,
+                    "accessibility_abuse_detected": static_results.get("accessibility_abuse_detected", False),
+                    "evasion_tactics": static_results.get("evasion_tactics", [])
                 }
             )
             print(f"[PIPELINE] DB updated to STATIC_ANALYSIS_COMPLETED")
+            
+            if static_results.get('accessibility_abuse_detected'):
+                remove_incident_ttl(record_id)
             
         # --- PHASE 3: Dynamic Sandbox ---
         print("\n[PIPELINE] -> Phase 3: Dynamic Sandbox")
@@ -151,10 +156,15 @@ def run_sandbox_from_file(file_path, record_id=None):
                 incident_status="STATIC_ANALYSIS_COMPLETED",
                 apk_analysis={
                     "risk_score": static_results.get("risk_score"),
-                    "scanner_json_report": static_results
+                    "scanner_json_report": static_results,
+                    "accessibility_abuse_detected": static_results.get("accessibility_abuse_detected", False),
+                    "evasion_tactics": static_results.get("evasion_tactics", [])
                 }
             )
             print(f"[PIPELINE] DB updated to STATIC_ANALYSIS_COMPLETED")
+            
+            if static_results.get('accessibility_abuse_detected'):
+                remove_incident_ttl(record_id)
             
         # --- PHASE 3: Dynamic Sandbox ---
         print("\n[PIPELINE] -> Phase 3: Dynamic Sandbox")

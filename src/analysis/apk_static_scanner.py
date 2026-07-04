@@ -127,7 +127,9 @@ def scan_apk(apk_path, config_path="config/monitored_brands.json", custom_brands
             "base64": []
         },
         "risk_score": 0,
-        "risk_level": "LOW"
+        "risk_level": "LOW",
+        "accessibility_abuse_detected": False,
+        "evasion_tactics": []
     }
     
     try:
@@ -165,6 +167,13 @@ def scan_apk(apk_path, config_path="config/monitored_brands.json", custom_brands
             print(f"\n{BLUE}[*] Auditing Android Permissions...{NC}")
             found_permissions = []
             for s in all_strings:
+                if s == 'android.permission.BIND_ACCESSIBILITY_SERVICE':
+                    print(f"  {RED}[!] ATTACKER EVASION DETECTED:{NC} BIND_ACCESSIBILITY_SERVICE found!")
+                    results["accessibility_abuse_detected"] = True
+                    if "BIND_ACCESSIBILITY_SERVICE" not in results["evasion_tactics"]:
+                        results["evasion_tactics"].append("BIND_ACCESSIBILITY_SERVICE")
+                    results["risk_score"] = 99
+                
                 if s in DANGEROUS_PERMISSIONS:
                     found_permissions.append(s)
             
