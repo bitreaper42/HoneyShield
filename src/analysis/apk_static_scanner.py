@@ -13,10 +13,7 @@ import base64
 import argparse
 
 # Shared utilities (colours, path bootstrap, string extractor)
-from src.analysis import (
-    RED, GREEN, YELLOW, BLUE, PURPLE, CYAN, NC, BOLD,
-    extract_strings_from_bytes
-)
+from src.analysis import (extract_strings_from_bytes)
 from src.Database_manager.db_manager import update_incident_record
 
 # Target Regex Patterns
@@ -87,7 +84,7 @@ def load_brands(config_path="config/monitored_brands.json", custom_brands_str=No
                     brands = data["brands"]
                     print(f"[*] Loaded {len(brands)} brand definitions from: {config_path}")
         except Exception as e:
-            print(f"{YELLOW}[!] Warning: Failed to parse brand config JSON ({str(e)}). Using default list.{NC}")
+            print(f" Warning: Failed to parse brand config JSON ({str(e)}). Using default list.")
             
     # Apply CLI custom overrides (Format: brand1:pkg1,pkg2;brand2:pkg3)
     if custom_brands_str:
@@ -99,18 +96,14 @@ def load_brands(config_path="config/monitored_brands.json", custom_brands_str=No
                 brands[brand_name.strip().lower()] = [p.strip().lower() for p in pkgs_str.split(',')]
             print(f"[*] Applied custom --brands override. Total monitored brands: {len(brands)}")
         except Exception as e:
-            print(f"{YELLOW}[!] Warning: Failed to parse custom --brands flag ({str(e)}).{NC}")
+            print(f" Warning: Failed to parse custom --brands flag {str(e)}.")
             
     return brands
 
 def scan_apk(apk_path, config_path="config/monitored_brands.json", custom_brands=None):
     if not os.path.exists(apk_path):
         raise Exception(f"File not found at {apk_path}")
-        
-    print(f"{CYAN}{BOLD}======================================================================{NC}")
-    print(f"{CYAN}{BOLD}              HoneyShield Static APK Threat Analyzer                  {NC}")
-    print(f"{CYAN}{BOLD}======================================================================{NC}")
-    print(f"[*] Target APK: {BOLD}{os.path.basename(apk_path)}{NC}")
+    print(f"[*] Target APK: os.path.basename(apk_path)")
     
     results = {
         "file_name": os.path.basename(apk_path),
@@ -126,8 +119,6 @@ def scan_apk(apk_path, config_path="config/monitored_brands.json", custom_brands
             "ips": [],
             "base64": []
         },
-        "risk_score": 0,
-        "risk_level": "LOW",
         "accessibility_abuse_detected": False,
         "evasion_tactics": []
     }
@@ -160,19 +151,18 @@ def scan_apk(apk_path, config_path="config/monitored_brands.json", custom_brands
             
             # Extract main package name
             package_name = extract_package_name(manifest_strings)
-            print(f"[*] Detected Android Package Name: {BOLD}{package_name}{NC}")
+            print(f"[*] Detected Android Package Name: {package_name}")
             results["package_name"] = package_name
             
             # --- 1. SCAN PERMISSIONS ---
-            print(f"\n{BLUE}[*] Auditing Android Permissions...{NC}")
+            print(f"\n Auditing Android Permissions..")
             found_permissions = []
             for s in all_strings:
                 if s == 'android.permission.BIND_ACCESSIBILITY_SERVICE':
-                    print(f"  {RED}[!] ATTACKER EVASION DETECTED:{NC} BIND_ACCESSIBILITY_SERVICE found!")
+                    print(f"[!] ATTACKER EVASION DETECTED:BIND_ACCESSIBILITY_SERVICE found!")
                     results["accessibility_abuse_detected"] = True
                     if "BIND_ACCESSIBILITY_SERVICE" not in results["evasion_tactics"]:
                         results["evasion_tactics"].append("BIND_ACCESSIBILITY_SERVICE")
-                    results["risk_score"] = 99
                 
                 if s in DANGEROUS_PERMISSIONS:
                     found_permissions.append(s)
@@ -180,15 +170,12 @@ def scan_apk(apk_path, config_path="config/monitored_brands.json", custom_brands
             if found_permissions:
                 for perm in found_permissions:
                     desc = DANGEROUS_PERMISSIONS[perm]
-                    print(f"  {RED}[!] Dangerous Permission found:{NC} {perm}")
+                    print(f"  [!] Dangerous Permission found: {perm}")
                     print(f"      Description: {desc}")
                     results["detections"]["permissions"].append({"permission": perm, "description": desc})
-                    results["risk_score"] += 15
-            else:
-                print(f"  {GREEN}[✔] No highly dangerous permissions flagged in manifest.{NC}")
                 
             # --- 2. GENERALIZED BRAND AUDIT (IMPERSONATION DETECTION) ---
-            print(f"\n{BLUE}[*] Auditing Brand References & Package Mismatch...{NC}")
+            print(f" Auditing Brand References & Package Mismatch...")
             brands_dict = load_brands(config_path, custom_brands)
             detected_brand_warnings = []
             detected_brand_matches = []
@@ -212,23 +199,18 @@ def scan_apk(apk_path, config_path="config/monitored_brands.json", custom_brands
                             "brand": brand_keyword,
                             "allowed_substrings": allowed_packages
                         })
-                        print(f"  {GREEN}[✔] Brand Reference Match:{NC} Brand \"{brand_keyword}\" referenced, package name is \"{package_name}\".")
+                        print(f"   Brand Reference Match: Brand \"{brand_keyword}\" referenced, package name is \"{package_name}\".")
                     else:
                         detected_brand_warnings.append({
                             "brand": brand_keyword,
                             "allowed_substrings": allowed_packages
                         })
-                        print(f"  {RED}[!] BRAND IMPERSONATION WARNING: Brand \"{brand_keyword}\" referenced in strings, but package name \"{package_name}\" does not match expected patterns ({', '.join(allowed_packages)}).{NC}")
-                        results["risk_score"] += 30
             
             results["detections"]["brand_mismatch_warnings"] = detected_brand_warnings
             results["detections"]["brand_matches"] = detected_brand_matches
-            
-            if not detected_brand_warnings and not detected_brand_matches:
-                print(f"  {GREEN}[✔] No monitored brand references detected.{NC}")
                 
             # --- 3. SCAN TELEGRAM BOT TOKENS ---
-            print(f"\n{BLUE}[*] Auditing Telegram Bot API Tokens...{NC}")
+            print(f"\n Auditing Telegram Bot API Tokens...")
             found_telegram = []
             for s in all_strings:
                 match = TELEGRAM_TOKEN_PATTERN.search(s)
@@ -238,16 +220,13 @@ def scan_apk(apk_path, config_path="config/monitored_brands.json", custom_brands
                         found_telegram.append(token)
                         
             if found_telegram:
-                print(f"  {RED}[!] CRITICAL: Hardcoded Telegram Bot Token(s) Detected (indicators of spyware/exfiltration):{NC}")
+                print(f"  CRITICAL: Hardcoded Telegram Bot Token(s) Detected (indicators of spyware/exfiltration)")
                 for token in found_telegram:
                     print(f"      - {token}")
                     results["detections"]["telegram"].append(token)
-                results["risk_score"] += 35
-            else:
-                print(f"  {GREEN}[✔] No Telegram Bot API tokens found.{NC}")
                 
             # --- 4. SCAN FIREBASE ENDPOINTS ---
-            print(f"\n{BLUE}[*] Checking for Firebase Endpoints...{NC}")
+            print(f"\n Checking for Firebase Endpoints...")
             found_firebase = []
             for s in all_strings:
                 match = FIREBASE_PATTERN.search(s)
@@ -257,16 +236,13 @@ def scan_apk(apk_path, config_path="config/monitored_brands.json", custom_brands
                         found_firebase.append(fb)
                         
             if found_firebase:
-                print(f"  {RED}[!] Firebase Backend Endpoints Detected (potential exfiltration point):{NC}")
+                print(f" Firebase Backend Endpoints Detected (potential exfiltration point):")
                 for fb in found_firebase:
                     print(f"      - https://{fb}")
                     results["detections"]["firebase"].append(fb)
-                results["risk_score"] += 15
-            else:
-                print(f"  {GREEN}[✔] No Firebase endpoints detected.{NC}")
                 
             # --- 5. SCAN HARDCODED URLS ---
-            print(f"\n{BLUE}[*] Checking for Hardcoded HTTP/HTTPS URLs...{NC}")
+            print(f"\n Checking for Hardcoded HTTP/HTTPS URLs...")
             found_urls = []
             for s in all_strings:
                 match = URL_PATTERN.search(s)
@@ -277,16 +253,15 @@ def scan_apk(apk_path, config_path="config/monitored_brands.json", custom_brands
                         found_urls.append(url)
                         
             if found_urls:
-                print(f"  {YELLOW}[!] Hardcoded third-party URLs detected:{NC}")
+                print(f"  [!] Hardcoded third-party URLs detected:")
                 for url in found_urls:
                     print(f"      - {url}")
                     results["detections"]["urls"].append(url)
-                results["risk_score"] += 5
             else:
-                print(f"  {GREEN}[✔] No suspicious hardcoded URLs found.{NC}")
+                print(f" No suspicious hardcoded URLs found.")
                 
             # --- 6. SCAN HARDCODED IP ADDRESSES ---
-            print(f"\n{BLUE}[*] Checking for Hardcoded IPv4 Addresses...{NC}")
+            print(f"Checking for Hardcoded IPv4 Addresses...")
             found_ips = []
             for s in all_strings:
                 match = IP_PATTERN.search(s)
@@ -301,16 +276,15 @@ def scan_apk(apk_path, config_path="config/monitored_brands.json", custom_brands
                             pass
                             
             if found_ips:
-                print(f"  {RED}[!] Hardcoded Public IP Addresses Detected (often used for direct C2 connections):{NC}")
+                print(f"  [!] Hardcoded Public IP Addresses Detected (often used for direct C2 connections):")
                 for ip in found_ips:
                     print(f"      - {ip}")
                     results["detections"]["ips"].append(ip)
-                results["risk_score"] += 15
             else:
-                print(f"  {GREEN}[✔] No hardcoded public IP addresses found.{NC}")
+                print(f"  [✔] No hardcoded public IP addresses found.")
                 
             # --- 7. SCAN SUSPICIOUS BASE64 PAYLOADS ---
-            print(f"\n{BLUE}[*] Analyzing Suspicious Base64 Strings...{NC}")
+            print(f"\n[*] Analyzing Suspicious Base64 Strings...")
             found_b64 = []
             for s in all_strings:
                 match = BASE64_PATTERN.search(s)
@@ -325,33 +299,13 @@ def scan_apk(apk_path, config_path="config/monitored_brands.json", custom_brands
                         pass
                         
             if found_b64:
-                print(f"  {RED}[!] ALERT: Decoded suspicious Base64 encoded payload:{NC}")
+                print(f"  [!] ALERT: Decoded suspicious Base64 encoded payload:")
                 for original, decoded in found_b64:
                     print(f"      - Original: \"{original}\"")
                     print(f"        Decoded:  \"{decoded}\"")
                     results["detections"]["base64"].append({"raw": original, "decoded": decoded})
-                results["risk_score"] += 20
             else:
-                print(f"  {GREEN}[✔] No suspicious Base64 encoded payloads detected.{NC}")
-                
-        # --- RISK SCORE EVALUATION ---
-        results["risk_score"] = min(results["risk_score"], 100)
-        
-        if results["risk_score"] >= 60:
-            results["risk_level"] = "CRITICAL / HIGH RISK"
-            color = RED
-        elif results["risk_score"] >= 25:
-            results["risk_level"] = "MEDIUM RISK"
-            color = YELLOW
-        else:
-            results["risk_level"] = "LOW RISK"
-            color = GREEN
-            
-        print(f"\n{CYAN}{BOLD}======================================================================{NC}")
-        print(f"{BOLD}Scan Summary for {results['file_name']}:{NC}")
-        print(f"  Risk Score: {color}{BOLD}{results['risk_score']}/100{NC}")
-        print(f"  Risk Level: {color}{BOLD}{results['risk_level']}{NC}")
-        print(f"{CYAN}{BOLD}======================================================================{NC}")
+                print(f"  [✔] No suspicious Base64 encoded payloads detected.")
         
         project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
         output_json_path = os.path.join(project_root, "data/outputs/apk_scan_results.json")

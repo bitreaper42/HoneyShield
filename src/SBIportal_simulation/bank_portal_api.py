@@ -87,7 +87,9 @@ def api_login():
                 "incident_status": "TRAP_TRIGGERED",
                 "forensic_intercept.triggeredAt": datetime.now(timezone.utc),
                 "forensic_intercept.attacker_real_ip": attacker_ip,
-                "forensic_intercept.device_fingerprint": user_agent
+                "forensic_intercept.device_fingerprint": user_agent,
+                "apk_analysis.unified_threat_score": 100,
+                "apk_analysis.verdict": "CRITICAL"
             },
             "$unset": {
                 "createdAt": ""  # CRITICAL: Removes the TTL flag, saving the document forever for law enforcement

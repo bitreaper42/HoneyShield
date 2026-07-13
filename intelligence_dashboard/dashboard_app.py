@@ -450,10 +450,9 @@ else:
         rows.append({
             "Incident ID":   "..." + d["_id"][-10:],
             "Status":        d.get("incident_status", "—"),
+            "Threat Score":  d.get("apk_analysis", {}).get("unified_threat_score", 0),
             "Channel":       d.get("ingress_data", {}).get("channel", "—"),
             "Contact":       d.get("ingress_data", {}).get("attacker_contact", "—"),
-            "Risk Score":    d.get("apk_analysis", {}).get("risk_score", "—"),
-            "VT Score":      d.get("osint_analysis", {}).get("virustotal_score", "—"),
             "Created":       fmt_dt(d.get("createdAt", "")),
             "__id":          d["_id"],
         })
@@ -520,9 +519,9 @@ else:
                 st.markdown(f"**Received** &nbsp; {fmt_dt(incident.get('createdAt'))}")
             with c2:
                 section("APK Static Analysis")
+                st.markdown(f"**Threat Score** &nbsp; `{ak.get('unified_threat_score', 0)} / 100`")
+                st.markdown(f"**Verdict** &nbsp; `{ak.get('verdict', 'UNDETECTED')}`")
                 st.markdown(f"**SHA-256** &nbsp; `{ak.get('apk_hash') or '—'}`")
-                st.markdown(f"**Risk Score** &nbsp; `{ak.get('risk_score') or '—'} / 100`")
-                st.markdown(f"**Risk Level** &nbsp; `{scanner.get('risk_level') or '—'}`")
                 st.markdown(f"**Package** &nbsp; `{scanner.get('package_name') or '—'}`")
                 st.markdown(f"**File Size** &nbsp; `{scanner.get('file_size_mb') or '—'} MB`")
 
@@ -555,7 +554,6 @@ else:
             c1, c2 = st.columns(2)
             with c1:
                 section("VirusTotal Analysis")
-                st.markdown(f"**VT Score** &nbsp; `{oa.get('virustotal_score') or '—'}`")
                 st.markdown(f"**Extracted URL** &nbsp; `{oa.get('extracted_url') or '—'}`")
                 behaviors = oa.get("sandbox_behaviors", [])
                 if behaviors:

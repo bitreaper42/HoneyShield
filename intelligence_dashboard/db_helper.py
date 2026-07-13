@@ -52,12 +52,18 @@ STATUS_COLORS = {
 # ── Database client (cached singleton) ──────────────────────────────────────
 _client: MongoClient | None = None
 
+import certifi
+
 def get_collection():
     """Return a live MongoCollection, creating the client if necessary."""
     global _client
     try:
         if _client is None:
-            _client = MongoClient(MONGODB_URI, serverSelectionTimeoutMS=5000)
+            _client = MongoClient(
+                MONGODB_URI, 
+                serverSelectionTimeoutMS=5000, 
+                tlsCAFile=certifi.where()
+            )
         _client.admin.command("ping")          # lightweight heartbeat
         return _client[DB_NAME][COLLECTION_NAME]
     except (ConnectionFailure, ServerSelectionTimeoutError) as e:

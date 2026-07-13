@@ -4,17 +4,16 @@
 # Extracts live dynamic network telemetry (IP connections, DNS query domains, HTTP calls, behavior flags).
 
 import os
-import sys
 import time
-import subprocess
 import json
 import hashlib
 import requests
 import argparse
+import math
+
 
 # Shared utilities (colours, path bootstrap)
-from src.analysis import RED, GREEN, YELLOW, BLUE, PURPLE, CYAN, NC, BOLD
-from src.Database_manager.db_manager import update_incident_record
+
 
 VT_API_URL = "https://www.virustotal.com/api/v3"
 
@@ -66,7 +65,7 @@ def get_file_info(sha256, api_key):
         else:
             response.raise_for_status()
     except Exception as e:
-        print(f"{YELLOW}[!] Error searching database by file hash: {str(e)}{NC}")
+        print(f" Error searching database by file hash: {str(e)}")
         raise e
     return None
 
@@ -91,7 +90,7 @@ def get_behaviour_summary(sha256, api_key):
         else:
             response.raise_for_status()
     except Exception as e:
-        print(f"{YELLOW}[!] Error retrieving behaviour summary: {str(e)}{NC}")
+        print(f" Error retrieving behaviour summary: {str(e)}")
         raise e
     return {}
 
@@ -149,12 +148,12 @@ def poll_analysis_status(analysis_id, api_key, max_wait_sec=360, poll_interval=4
             if status == "completed":
                 return True
             elif status == "failed":
-                print(f"{RED}[!] VirusTotal analysis failed on the server side.{NC}")
+                print(f"[!] VirusTotal analysis failed on the server side.")
                 return False
         except Exception as e:
-            print(f"    {YELLOW}[Warning] Error polling status: {e}{NC}")
+            print(f"    [Warning] Error polling status: {e}")
             
-    print(f"{RED}[!] Dynamic analysis polling timed-out after {max_wait_sec}s.{NC}")
+    print(f"[!] Dynamic analysis polling timed-out after {max_wait_sec}s.")
     return False
 
 def parse_behaviour_report(file_attr, behaviour_attr, sha256):
@@ -164,11 +163,6 @@ def parse_behaviour_report(file_attr, behaviour_attr, sha256):
     suspicious = stats.get("suspicious", 0)
     harmless = stats.get("harmless", 0)
     undetected = stats.get("undetected", 0)
-    total = malicious + suspicious + harmless + undetected
-    
-    threat_score = 0
-    if total > 0:
-        threat_score = int(((malicious + suspicious) / total) * 100)
         
     if malicious > 3:
         verdict = "MALICIOUS"
@@ -224,7 +218,6 @@ def parse_behaviour_report(file_attr, behaviour_attr, sha256):
     
     return {
         "verdict": verdict,
-        "threat_score": threat_score,
         "sha256": sha256,
         "domains": sorted(list(domains)),
         "ips": sorted(list(ips)),
@@ -234,17 +227,14 @@ def parse_behaviour_report(file_attr, behaviour_attr, sha256):
 
 def run_real_sandbox(target, api_key):
     """Orchestrates the dynamic VT pipeline for the APK path or SHA-256 hash."""
-    print(f"{CYAN}{BOLD}======================================================================{NC}")
-    print(f"{CYAN}{BOLD}              HoneyShield Dynamic APK Threat Analyzer                 {NC}")
-    print(f"{CYAN}{BOLD}======================================================================{NC}")
     
     is_hash = len(target) == 64 and all(c in "0123456789abcdefABCDEF" for c in target)
     
     if is_hash:
         sha256 = target.lower()
-        print(f"[*] Target SHA-256 Hash: {BOLD}{sha256}{NC}")
+        print(f"[*] Target SHA-256 Hash: {sha256}")
     else:
-        print(f"[*] Target APK: {BOLD}{os.path.basename(target)}{NC}")
+        print(f"[*] Target APK: {os.path.basename(target)}")
         sha256 = calculate_sha256(target)
         print(f"[*] Calculated SHA-256: {sha256}")
         
@@ -253,7 +243,7 @@ def run_real_sandbox(target, api_key):
     behaviour_attr = {}
     
     if file_attr is not None:
-        print(f"{GREEN}[✔] File found in VirusTotal database!{NC}")
+        print(f"[✔] File found in VirusTotal database!")
         behaviour_attr = get_behaviour_summary(sha256, api_key)
     else:
         if is_hash:
@@ -261,7 +251,7 @@ def run_real_sandbox(target, api_key):
         # Step 2: Detonate file
         print(f"[*] Dynamic logs missing. Initiating file upload and sandbox detonation...")
         analysis_id = upload_file_to_vt(target, api_key)
-        print(f"{GREEN}[+] Upload Successful! Analysis ID: {analysis_id}{NC}")
+        print(f"[+] Upload Successful! Analysis ID: {analysis_id}")
         
         # Step 3: Polling loop
         completed = poll_analysis_status(analysis_id, api_key)
@@ -276,28 +266,25 @@ def run_real_sandbox(target, api_key):
         behaviour_attr = get_behaviour_summary(sha256, api_key)
         if not behaviour_attr:
             # If still no behaviour, construct an empty template to allow basic stats
-            print(f"{YELLOW}[!] Dynamic run completed but no consolidated network behaviours returned.{NC}")
+            print(f" Dynamic run completed but no consolidated network behaviours returned.")
             behaviour_attr = {}
 
     # Step 4: Parse and print summary
     results = parse_behaviour_report(file_attr, behaviour_attr, sha256)
     
-    color = GREEN
-    if results["verdict"] in ["MALICIOUS", "SUSPICIOUS"]:
-        color = RED if results["verdict"] == "MALICIOUS" else YELLOW
+    
         
-    print(f"\n{CYAN}{BOLD}======================================================================{NC}")
+    print(f"\n======================================================================")
     print(f"Dynamic Analysis Summary:")
-    print(f"  Verdict: {color}{BOLD}{results['verdict']}{NC}")
-    print(f"  Threat Score: {color}{BOLD}{results['threat_score']}/100{NC}")
+    print(f"  Verdict: {results['verdict']}")
     print(f"  IP Connections (C2): {len(results['ips'])}")
     print(f"  Domain Connections (DNS): {len(results['domains'])}")
     print(f"  HTTP Calls Logged: {len(results['http_calls'])}")
     print(f"  Behaviors Matched: {len(results['signatures_triggered'])}")
-    print(f"{CYAN}{BOLD}======================================================================{NC}")
+    print(f"======================================================================")
     
     if results["signatures_triggered"]:
-        print(f"\n{BLUE}[*] Triggered Behavior Signatures:{NC}")
+        print(f"\n[*] Triggered Behavior Signatures:")
         for sig in results["signatures_triggered"]:
             print(f"  - {sig}")
             

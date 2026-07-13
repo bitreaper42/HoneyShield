@@ -80,7 +80,6 @@ def create_incident_record(**kwargs):
         tls_expiry (str): TLS expiration date
         apk_hash (str): Hash of the APK
         impersonated_brand (str): Brand impersonated
-        risk_score (float): Calculated risk score
         scanner_json_report (dict): Full scanner report
         honeytoken_username (str): Honeytoken username
         honeytoken_password (str): Honeytoken password
@@ -108,7 +107,6 @@ def create_incident_record(**kwargs):
         
         "osint_analysis": {
             "extracted_url": kwargs.get("extracted_url"),
-            "virustotal_score": kwargs.get("virustotal_score"),
             "domain_age_days": kwargs.get("domain_age_days"),
             "infrastructure_audit": {
                 "ip": kwargs.get("infrastructure_ip"),
@@ -124,10 +122,11 @@ def create_incident_record(**kwargs):
         "apk_analysis": {
             "apk_hash": kwargs.get("apk_hash"),
             "impersonated_brand": kwargs.get("impersonated_brand"),
-            "risk_score": kwargs.get("risk_score"),
             "scanner_json_report": kwargs.get("scanner_json_report", {}),
             "accessibility_abuse_detected": kwargs.get("accessibility_abuse_detected", False),
-            "evasion_tactics": kwargs.get("evasion_tactics", [])
+            "evasion_tactics": kwargs.get("evasion_tactics", []),
+            "unified_threat_score": kwargs.get("unified_threat_score", 0),
+            "verdict": kwargs.get("verdict", "UNDETECTED")
         },
         
         "honeytokens": {
@@ -355,38 +354,3 @@ if __name__ == '__main__':
     # 1. Setup Database (Create TTL Index)
     print("\n--- Setting up TTL Index ---")
     setup_database()
-
-    # 2. Insert a Dummy Record
-    print("\n--- Inserting Dummy Record ---")
-    record_id = create_incident_record(
-        incident_status="LURE_CAPTURED",
-        attacker_contact="@scammer_telegram_id",
-        channel="Telegram",
-        extracted_url="http://malicious-honey-domain.com/login",
-        virustotal_score="34/89",
-        domain_age_days=2,
-        infrastructure_ip="198.51.100.14",
-        infrastructure_asn="AS64496",
-        infrastructure_hosting="Bulletproof Hosting Example",
-        tls_issuer="Let's Encrypt",
-        tls_expiry="2024-09-01T00:00:00Z",
-        apk_hash="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-        impersonated_brand="TargetBank",
-        risk_score=9.5,
-        scanner_json_report={"malware_family": "FakeBanker", "detected_permissions": ["SMS_READ"]},
-        accessibility_abuse_detected=True,
-        evasion_tactics=["BIND_ACCESSIBILITY_SERVICE"],
-        honeytoken_username="honey_user_1337",
-        honeytoken_password="Password123!",
-        honeytoken_virtual_otp="883399"
-    )
-
-    if record_id:
-        print(f"\nTest completed successfully. Document ID: {record_id}")
-        print("Note: The 'forensic_intercept' fields are correctly set to None per requirements.")
-        
-        # Test TTL removal
-        print("\n--- Testing TTL Removal (Accessibility Abuse Detected) ---")
-        remove_incident_ttl(record_id)
-    else:
-        print("\nTest failed. Could not insert document.")
