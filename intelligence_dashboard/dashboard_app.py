@@ -73,7 +73,7 @@ def run_safe_browsing_block(target_url):
             return True, f"Network Link Flagged. Web Risk execution pipeline tracking token: {response.json().get('name')}"
             
         # Scenario B: Standard developer tier hits Google's gateway successfully but requires corporate approval
-        elif response.status_code == 404 and "Method not found" in response.text:
+        elif response.status_code in [400 ,404] and "Method not found" in response.text:
             return True, f"API Pipeline Operational! Secure handshake established with Google Cloud Gateway. (Sandbox Mode: Awaiting Enterprise Tier Activation)"
             
         return False, f"Google API Refusal [{response.status_code}]: {response.text}"
@@ -489,62 +489,6 @@ kpi(k2, "Active Probes — Trap Ready", metrics["active_probes"])
 kpi(k3, "Successful Captures",        metrics["captures"],      red=True)
 kpi(k4, "Pipeline Success Rate",      f"{metrics['success_rate']}%")
 
-st.divider()
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# CHARTS
-# ─────────────────────────────────────────────────────────────────────────────
-section("Attack Funnel  &  Status Distribution")
-col_f, col_d = st.columns([3, 2])
-
-sc = metrics["status_counts"]
-
-with col_f:
-    funnel_s = [s for s in STATUS_ORDER if s != "PIPELINE_FAILED"]
-    funnel_v = [sc.get(s, 0) for s in funnel_s]
-    fc_colors = FUNNEL_COLORS[:len(funnel_s)]
-
-    fig = go.Figure(go.Funnel(
-        y=funnel_s,
-        x=funnel_v,
-        textposition="inside",
-        textinfo="value+percent initial",
-        marker=dict(color=fc_colors, line=dict(color=BG, width=1)),
-        connector=dict(line=dict(color=BORDER, width=1, dash="dot")),
-    ))
-    fig.update_layout(**plotly_base(), height=300)
-    st.plotly_chart(fig, use_container_width=True)
-
-with col_d:
-    labels = list(sc.keys())
-    values = [sc[k] for k in labels]
-    colors = [STATUS_COLOR_MAP.get(k, "#374151") for k in labels]
-
-    fig2 = go.Figure(go.Pie(
-        labels=labels,
-        values=values,
-        hole=0.62,
-        marker=dict(colors=colors, line=dict(color=BG, width=2)),
-        textinfo="percent",
-        textfont=dict(size=10, color=TEXT),
-        hovertemplate="<b>%{label}</b><br>Count: %{value}<br>%{percent}<extra></extra>",
-    ))
-    fig2.update_layout(
-        **plotly_base(),
-        legend=dict(
-            orientation="v",
-            font=dict(size=9, color=SUBTEXT),
-            bgcolor="rgba(0,0,0,0)",
-        ),
-        height=300,
-        annotations=[dict(
-            text=f"<b>{metrics['total']}</b><br><span style='font-size:10px'>Total</span>",
-            x=0.5, y=0.5, showarrow=False,
-            font=dict(size=17, color=TEXT),
-        )],
-    )
-    st.plotly_chart(fig2, use_container_width=True)
 
 st.divider()
 

@@ -27,6 +27,9 @@ TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
 
 def twiml_reply(message: str) -> str:
     """Return TwiML with XML-safe message text."""
+    if not message:
+        return "<Response></Response>"
+        
     safe = (
         message.replace("&", "&amp;")
         .replace("<", "&lt;")
@@ -55,7 +58,7 @@ def download_twilio_media(media_url: str):
 
 @app.route('/webhook', methods=['POST'])
 def incoming_message():
-    incoming_msg = request.form.get('Body', '').lower()
+    incoming_msg = request.form.get('Body', '')
     sender_number = request.form.get('From', '')
     num_media = int(request.form.get('NumMedia', 0))
 

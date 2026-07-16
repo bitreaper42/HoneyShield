@@ -33,6 +33,7 @@ REPLY_MAX_CHARS = int(os.getenv("REPLY_MAX_CHARS", "320"))
 EMERGENCY_FALLBACK = "Sorry, I didn't catch that. Can you say that again?"
 
 _history: dict[str, list[dict[str, str]]] = {}
+_fallback_counts: dict[str, int] = {}
 MAX_HISTORY_TURNS = 6
 
 BANNED_OUTPUT_PATTERNS = [
@@ -72,7 +73,7 @@ def classify_branch(incoming_msg: str) -> str:
     msg = (incoming_msg or "").strip().lower()
     if not msg:
         return "greeting"
-    if msg in ("hi", "hello", "hey", "hii", "hola", "start", "good morning", "good evening"):
+    if msg in ("hi","Hi", "hello" ,"Hello", "hey", "hii", "hola", "start", "good morning", "good evening"):
         return "greeting"
     if "kyc" in msg or "blocked" in msg or "sbi" in msg or "yono" in msg:
         return "kyc"
@@ -180,21 +181,20 @@ def get_lure_reply(
     resolved_branch = branch or classify_branch(incoming_msg)
     
     is_first_message = sender_id not in _history or len(_history[sender_id]) == 0
-    if is_first_message and resolved_branch != "greeting":
+    
+    if (is_first_message and resolved_branch != "greeting") or \
+       (not is_first_message and resolved_branch in ("fallback", "greeting")):
+        count = _fallback_counts.get(sender_id, 0)
+        if count >= 2:
+            print(f"[REPLY] Max off-topic rejections ({count}) reached for {sender_id}. Ignoring message.")
+            return ""
+        _fallback_counts[sender_id] = count + 1
+        
         reply_text = "??"
-        print(f"[REPLY] First message not a greeting, replying with '??'")
+        print(f"[REPLY] Unwanted message sequence or off-topic, replying with '??'")
         _history_add(sender_id, "user", incoming_msg)
         _history_add(sender_id, "assistant", reply_text)
         return reply_text
-    
-    if len(_history.get(sender_id, [])) > 0:
-        last_msg = _history[sender_id][-1]
-        if last_msg.get("role") == "assistant" and last_msg.get("content") == "??":
-            reply_text = "its okay talk to the point who are you and what do you want."
-            print(f"[REPLY] Following up after '??' rejection")
-            _history_add(sender_id, "user", incoming_msg)
-            _history_add(sender_id, "assistant", reply_text)
-            return reply_text
     
     if resolved_branch in ("media_pdf", "media_apk", "media_other", "url"):
         reply_text = "okay I will see it .."
@@ -212,6 +212,11 @@ def get_lure_reply(
         return llm_text
 
     print("[REPLY] LLM unavailable, using emergency fallback.")
+    count = _fallback_counts.get(sender_id, 0)
+    if count >= 2:
+        print(f"[REPLY] Max emergency fallbacks ({count}) reached for {sender_id}. Ignoring message.")
+        return ""
+    _fallback_counts[sender_id] = count + 1
     return EMERGENCY_FALLBACK
 
 
