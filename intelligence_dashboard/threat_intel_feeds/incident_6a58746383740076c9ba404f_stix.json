@@ -1,0 +1,22 @@
+{
+    "type": "bundle",
+    "id": "bundle--5bc8bdfb-94f3-4917-92bd-a024e3ccba60",
+    "spec_version": "2.1",
+    "objects": [
+        {
+            "id": "indicator--61ce1e77-41e5-455b-a8e9-642e60030d1e",
+            "type": "indicator",
+            "spec_version": "2.1",
+            "created": "2026-07-16T11:04:03Z",
+            "modified": "2026-07-16T11:04:03Z",
+            "name": "Malicious Android Sideload Signature Drop",
+            "pattern": "[file:hashes.'SHA-256' = 'f0737215bf2e5343e0b13b9dce288b3f4b197162f874ab20a3e153af1c3be933']",
+            "pattern_type": "stix",
+            "valid_from": "2026-07-16T11:04:03Z",
+            "labels": [
+                "malicious-activity",
+                "whatsapp-sideload-mitigation"
+            ]
+        }
+    ]
+}

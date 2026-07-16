@@ -9,3 +9,5 @@ apk_dynamic_results.json
 hunted_domains.json
 apk_scan_results.json
 data/outputs/c2_detection_report.json
+secrets.toml
+
