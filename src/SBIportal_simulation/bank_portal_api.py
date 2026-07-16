@@ -3,6 +3,7 @@ from pymongo import MongoClient
 from pymongo.errors import ConnectionFailure
 from datetime import datetime, timezone
 from dotenv import load_dotenv
+from src.Database_manager.db_manager import push_to_sdk_database
 import os
 import time
 
@@ -95,6 +96,8 @@ def api_login():
                 "createdAt": ""  # CRITICAL: Removes the TTL flag, saving the document forever for law enforcement
             }
         }
+
+        push_to_sdk_database(incident , 100 , "CRITICAL")
         
         collection.update_one({"_id": incident["_id"]}, update_operation)
         

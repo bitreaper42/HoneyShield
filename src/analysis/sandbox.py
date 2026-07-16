@@ -137,7 +137,7 @@ def run_sandbox_pipeline(target, record_id=None, is_local_file=False):
                 print(f"[PIPELINE] FINAL SCORE: {score}/100 | VERDICT: {verdict}")
                 
                 # Push to secondary SDK Database if score meets threshold
-                if score >= 30:
+                if score >= 60:
                     print(f"[PIPELINE] Score ({score}) meets threshold. Pushing to SDK Database...")
                     push_to_sdk_database(record, score, verdict)
                 

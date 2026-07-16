@@ -302,10 +302,10 @@ def scan_apk(apk_path, config_path="config/monitored_brands.json", custom_brands
                 print(f"  [!] ALERT: Decoded suspicious Base64 encoded payload:")
                 for original, decoded in found_b64:
                     print(f"      - Original: \"{original}\"")
-                    print(f"        Decoded:  \"{decoded}\"")
+                    # Removed printing of 'decoded' to avoid charmap codec errors on Windows
                     results["detections"]["base64"].append({"raw": original, "decoded": decoded})
             else:
-                print(f"  [✔] No suspicious Base64 encoded payloads detected.")
+                print(f"  [+] No suspicious Base64 encoded payloads detected.")
         
         project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
         output_json_path = os.path.join(project_root, "data/outputs/apk_scan_results.json")

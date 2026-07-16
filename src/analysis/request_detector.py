@@ -32,35 +32,59 @@ URL_PATTERN = re.compile(
 
 
 def scan_bundle_for_url_and_params(apk_path, suspicious_domains):
-    """Scans the APK assets for suspicious URLs and parameter references."""
+    """Scans the APK assets for suspicious URLs and parameter references.
+    Supports React Native (index.android.bundle), Flutter (assets/), and
+    generic native APKs by scanning all text-like asset files."""
     print(f"[*] Analyzing APK file: {apk_path}")
     if not os.path.exists(apk_path):
         raise FileNotFoundError(f"APK file not found at {apk_path}")
 
     extracted_urls = []
 
+    # Candidate bundle paths to try, in priority order
+    BUNDLE_CANDIDATES = [
+        "assets/index.android.bundle",    # React Native
+        "assets/flutter_assets/main.dart.snapshot",  # Flutter
+    ]
+
     with zipfile.ZipFile(apk_path, 'r') as zip_ref:
         namelist = zip_ref.namelist()
 
-        # Focus on the javascript bundle asset
-        bundle_path = 'assets/index.android.bundle'
-        if bundle_path not in namelist:
-            raise FileNotFoundError(
-                f"React Native asset bundle {bundle_path} not found in the APK."
-            )
+        # Determine which files to scan
+        files_to_scan = []
+        for candidate in BUNDLE_CANDIDATES:
+            if candidate in namelist:
+                files_to_scan.append(candidate)
+                print(f"[*] Found bundle: {candidate}")
 
-        data = zip_ref.read(bundle_path)
-        strings = extract_strings_from_bytes(data)
+        # If no known bundle found, scan all .js and .txt files in assets/
+        if not files_to_scan:
+            files_to_scan = [
+                f for f in namelist
+                if f.startswith("assets/") and (
+                    f.endswith(".js") or f.endswith(".txt") or f.endswith(".bundle")
+                )
+            ]
+            if files_to_scan:
+                print(f"[*] No standard bundle found. Scanning {len(files_to_scan)} asset file(s) for URLs.")
+            else:
+                print("[!] No scannable bundle or asset files found in this APK. Skipping URL extraction.")
+                return []
 
-        for s in strings:
-            urls = URL_PATTERN.findall(s)
-            for url in urls:
-                for sd in suspicious_domains:
-                    if sd in url:
-                        extracted_urls.append(url)
-                        break
+        for bundle_path in files_to_scan:
+            try:
+                data = zip_ref.read(bundle_path)
+                strings = extract_strings_from_bytes(data)
+                for s in strings:
+                    urls = URL_PATTERN.findall(s)
+                    for url in urls:
+                        for sd in suspicious_domains:
+                            if sd in url:
+                                extracted_urls.append(url)
+                                break
+            except Exception as e:
+                print(f"[!] Could not read {bundle_path}: {e}")
 
-    # Resolve unique URLs
     extracted_urls = sorted(list(set(extracted_urls)))
     return extracted_urls
 
@@ -80,7 +104,7 @@ def probe_endpoint(base_url, path, credentials=None):
         resp = requests.post(url, json=test_payload, headers=headers, timeout=8)
         print(f"    [POST] Status Code: {resp.status_code}")
         if resp.status_code == 200:
-            print(f"    {GREEN}[✔] Success response received on POST!{NC}")
+            print(f"    {GREEN}[+] Success response received on POST!{NC}")
             detected_method = "POST"
             response_payload = resp.text
         elif "Cannot POST" in resp.text:
@@ -93,7 +117,7 @@ def probe_endpoint(base_url, path, credentials=None):
         resp = requests.get(url, timeout=8)
         print(f"    [GET] Status Code: {resp.status_code}")
         if resp.status_code == 200 and detected_method is None:
-            print(f"    {GREEN}[✔] Success response received on GET!{NC}")
+            print(f"    {GREEN}[+] Success response received on GET!{NC}")
             detected_method = "GET"
             response_payload = resp.text
         elif "Cannot GET" in resp.text:
@@ -149,7 +173,7 @@ def run_detection(apk_path, record_id=None):
                             "password": password,
                             "otp": raw_tokens.get("virtual_otp_number")
                         }
-                        print(f"    {GREEN}[✔] Honeytokens loaded from MongoDB.{NC}")
+                        print(f"    {GREEN}[+] Honeytokens loaded from MongoDB.{NC}")
                     else:
                         print(f"    {YELLOW}[!] Honeytoken fields missing in record. "
                               f"Falling back to generated credentials.{NC}")
@@ -194,9 +218,10 @@ def run_detection(apk_path, record_id=None):
         urls = scan_bundle_for_url_and_params(apk_path, suspicious_domains)
 
         if not urls:
-            raise Exception("No URLs matching suspicious domains extracted from the APK.")
+            print(f"{YELLOW}[!] No URLs matching suspicious domains extracted from the APK. Skipping probes.{NC}")
+            return {"c2_base_url": None, "probed_endpoints": []}
 
-        print(f"{GREEN}[✔] Extracted C2 URL String from Bundle: {urls[0]}{NC}")
+        print(f"{GREEN}[+] Extracted C2 URL String from Bundle: {urls[0]}{NC}")
 
         # De-concatenate and extract base domain
         parsed_url = urlparse(urls[0])
@@ -240,7 +265,7 @@ def run_detection(apk_path, record_id=None):
             print(f"  {RED}[!] No active endpoints detected during API probes.{NC}")
         else:
             for endpoint in detection_results["probed_endpoints"]:
-                print(f"  {GREEN}[✔] Active Endpoint:{NC} {base_url}{endpoint['endpoint']}")
+                print(f"  {GREEN}[+] Active Endpoint:{NC} {base_url}{endpoint['endpoint']}")
                 print(f"      Method: {BOLD}{endpoint['method']}{NC}")
                 if "params" in endpoint:
                     print(f"      Parameters: {BOLD}{json.dumps(endpoint['params'])}{NC}")

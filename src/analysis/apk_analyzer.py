@@ -17,7 +17,7 @@ from src.Database_manager.db_manager import update_incident_record
 
 
 # Configurable limits
-MAX_FILE_SIZE = 100 * 1024 * 1024  # 100 MB limit
+MAX_FILE_SIZE = 200 * 1024 * 1024  # 200 MB limit
 TIMEOUT = 15  # seconds
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
@@ -56,8 +56,8 @@ def download_and_hash_apk(url, output_path="data/inputs/sample.apk", hash_output
                     
         # Successfully downloaded
         file_hash = sha256.hexdigest()
-        print(f"[✔] Safe download complete. File saved to: {output_path} ({bytes_downloaded / (1024*1024):.2f} MB)")
-        print(f"[✔] Computed SHA-256: {file_hash}")
+        print(f"[+] Safe download complete. File saved to: {output_path} ({bytes_downloaded / (1024*1024):.2f} MB)")
+        print(f"[+] Computed SHA-256: {file_hash}")
         
         
         # Write hash to local output file

@@ -10,9 +10,17 @@ def calculate_unified_threat_score(incident_record: dict) -> tuple:
     scanner_report = apk_data.get("scanner_json_report", {})
     
     # --- Extracted Fields ---
-    permissions = scanner_report.get("permissions", [])
-    base64_strings = scanner_report.get("suspicious_base64_strings", [])
-    hardcoded_urls = scanner_report.get("hardcoded_urls", [])
+    # Heuristics & permissions are nested under "detections"
+    detections = scanner_report.get("detections", {})
+    
+    # Permissions is a list of dicts: [{"permission": "...", "description": "..."}]
+    raw_permissions = detections.get("permissions", [])
+    permissions = [p.get("permission") for p in raw_permissions if isinstance(p, dict)]
+    
+    base64_strings = detections.get("base64", [])
+    hardcoded_urls = detections.get("urls", [])
+    brand_warnings = detections.get("brand_mismatch_warnings", [])
+    
     evasion_tactics = apk_data.get("evasion_tactics", [])
     
     # Dynamic/OSINT fields
@@ -43,7 +51,7 @@ def calculate_unified_threat_score(incident_record: dict) -> tuple:
     p_net = min((net_raw / 65) * 100, 100)
     
     # --- 3. Brand Impersonation Percentage (P_brand) - Weight: 15% (0.15) ---
-    brand_spoofed = bool(apk_data.get("impersonated_brand")) or "SPOOF" in combined_sigs
+    brand_spoofed = bool(apk_data.get("impersonated_brand")) or len(brand_warnings) > 0 or "SPOOF" in combined_sigs
     p_brand = 100 if brand_spoofed else 0
     
     # --- 4. Heuristics & Obfuscation Percentage (P_heur) - Weight: 10% (0.10) ---

@@ -243,7 +243,7 @@ def run_real_sandbox(target, api_key):
     behaviour_attr = {}
     
     if file_attr is not None:
-        print(f"[✔] File found in VirusTotal database!")
+        print(f"[+] File found in VirusTotal database!")
         behaviour_attr = get_behaviour_summary(sha256, api_key)
     else:
         if is_hash:
