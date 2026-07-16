@@ -1,6 +1,8 @@
+from pymongo import collection
 import os
 import secrets
 import string
+import requests
 from datetime import datetime, timezone
 from dotenv import load_dotenv
 from pymongo import MongoClient, ASCENDING
@@ -347,6 +349,64 @@ def generate_and_assign_honeytokens(record_id):
         "password": password,
         "virtual_otp_number": virtual_otp_number
     }
+
+# ──────────────────────────────────────────────────────────────────────────
+# SDK DATABASE SYNC LOGIC
+# ──────────────────────────────────────────────────────────────────────────
+
+ADMIN_API_BASE_URL = os.getenv('ADMIN_API_BASE_URL', 'http://localhost:8000')
+
+    
+
+def push_to_sdk_database(incident_record, score, verdict):
+    """
+    Pushes threat intelligence to the SDK database if the score >= 30.
+    Uses upsert based on sha256 to avoid duplicates.
+    """
+        
+    if not ADMIN_API_BASE_URL:
+        print("[SDK DB] No ADMIN_API_BASE_URL found in environment variables.")
+        return None
+        
+    # Extract fields from the structured incident record
+    apk_analysis = incident_record.get("apk_analysis", {})
+    
+    sha256 = apk_analysis.get("apk_hash")
+    if not sha256:
+        print("[SDK DB] Cannot sync record: missing apk_hash.")
+        return False
+        
+    # Attempt to extract package name (from scanner report if available)
+    package_name = "Unknown"
+    scanner_report = apk_analysis.get("scanner_json_report", {})
+    if isinstance(scanner_report, dict):
+        package_name = scanner_report.get("package_name", "Unknown")
+
+    # Format description
+    evasion_tactics = apk_analysis.get('evasion_tactics') or []
+    description = f"HoneyShield Automated Assessment: Score {score}/100. Evasion Tactics: {', '.join(evasion_tactics)}"
+
+    # Build the document
+    payload = {
+        "sha256": sha256,
+        "packageName": package_name,
+        "threatLevel": verdict,
+        "description": description
+    }
+
+    endpoint_url = f"{ADMIN_API_BASE_URL.rstrip('/')}/admin/blacklist"
+    try:
+        # Upsert based on sha256
+        response = requests.post(endpoint_url, json=payload, timeout=10)
+        if response.status_code in [200, 201]:
+            print("[SDK DB] SUCCESS: Threat intelligence pushed to SDK database.")
+            return True
+        else:
+            print(f"[SDK DB] Failed to push the hashes. Status Code: {response.status_code}, Response: {response.text}")
+            return False
+    except Exception as e:
+        print(f"[SDK DB] Failed to connect database: {e}")
+        return False
 
 if __name__ == '__main__':
     print("--- Threat Intel Database Manager Executing ---")

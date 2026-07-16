@@ -4,7 +4,7 @@ import base64
 import threading
 from dotenv import load_dotenv
 
-from src.Database_manager.db_manager import update_incident_record, generate_and_assign_honeytokens, remove_incident_ttl, get_incident_record
+from src.Database_manager.db_manager import update_incident_record, generate_and_assign_honeytokens, remove_incident_ttl, get_incident_record, push_to_sdk_database
 from src.analysis.apk_analyzer import download_and_hash_apk
 from src.analysis.apk_static_scanner import scan_apk
 from src.analysis.apk_dynamic_sandbox import run_real_sandbox, load_env_key
@@ -135,6 +135,11 @@ def run_sandbox_pipeline(target, record_id=None, is_local_file=False):
                     }
                 )
                 print(f"[PIPELINE] FINAL SCORE: {score}/100 | VERDICT: {verdict}")
+                
+                # Push to secondary SDK Database if score meets threshold
+                if score >= 30:
+                    print(f"[PIPELINE] Score ({score}) meets threshold. Pushing to SDK Database...")
+                    push_to_sdk_database(record, score, verdict)
                 
         print("\n[PIPELINE] [+] Full HoneyShield Pipeline Completed Successfully!")
 
