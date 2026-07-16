@@ -24,8 +24,12 @@ USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTM
 def download_and_hash_apk(url, output_path="data/inputs/sample.apk", hash_output_path="data/inputs/sample_apk_hash.txt"):
     print(f"[*] Starting defensive APK download from: {url}")
     
-    # Configure request with a custom user-agent
-    req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+    # Configure request with a custom user-agent and ngrok bypass header
+    headers = {
+        "User-Agent": USER_AGENT,
+        "ngrok-skip-browser-warning": "true"
+    }
+    req = urllib.request.Request(url, headers=headers)
     sha256 = hashlib.sha256()
     bytes_downloaded = 0
     
